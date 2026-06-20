@@ -25,6 +25,9 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert data["lead"]["agent_id"] == "demo.lead"
     assert data["work"]["agent_id"] == "demo.work"
     assert data["broker"]["auto_start"] is True
+    lead_skill = paths["lead_skill"].read_text(encoding="utf-8")
+    assert "do not do the same task yourself" in lead_skill
+    assert "use a different scope than the worker" in lead_skill
 
 
 def test_cli_init_uses_current_folder_name_by_default(monkeypatch, tmp_path):

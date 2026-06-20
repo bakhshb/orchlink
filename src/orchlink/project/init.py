@@ -26,6 +26,8 @@ Rules:
 - Send small tasks.
 - Ask for PLAN before risky implementation.
 - Include clear scope and constraints.
+- After delegating, do not do the same task yourself unless the user asks for parallel work.
+- If working in parallel, use a different scope than the worker.
 - Review worker replies before continuing.
 - Do not let the worker edit forbidden files.
 - If worker returns BLOCKER, decide the next step.
