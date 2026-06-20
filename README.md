@@ -73,7 +73,13 @@ Send a task from the lead session, or from any shell in the same project:
 orch ask work -t T001 -m "Inspect the project and return PLAN only."
 ```
 
-`orch ask` queues the task and returns immediately. The worker reply appears in the lead Pi chat. If you want the shell command to block until the reply arrives, add `--wait`.
+`orch ask` queues the message and returns immediately. Use it when the lead can continue on unrelated scope while the worker thinks. The lead should treat the worker's scope as pending until the reply arrives.
+
+If the next lead decision depends on the worker reply, wait explicitly:
+
+```bash
+orch ask work --wait -t T001 -m "Inspect the project and return PLAN only."
+```
 
 Use Orchlink for discussion too, not just delegation:
 

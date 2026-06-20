@@ -25,11 +25,12 @@ orch ask work --wait --task <TASK_ID> --msg "<TASK_MESSAGE>"
 Rules:
 - Start with discussion when scope, risk, or workload is unclear.
 - Ask the worker to propose a workload split for larger work.
-- Send small messages with clear scope and constraints.
-- Ask for PLAN before risky implementation.
-- After sending work to the worker, do not do the same scope yourself unless the user asks for parallel work.
+- Use normal `orch ask` when you can continue on unrelated scope while the worker thinks.
+- Use `orch ask --wait` when the next decision depends on the worker reply.
+- After async `orch ask`, mark that scope as pending and do not conclude it before the worker replies.
+- Do not do the same scope yourself unless the user asks for parallel work.
 - If working in parallel, split the scope explicitly.
-- Treat worker replies as part of the conversation: review, decide, and send a follow-up when needed.
+- Treat worker replies as part of the conversation: reconcile them with your current state, then decide or send a follow-up.
 - Do not let the worker edit forbidden files.
 - If worker returns BLOCKER, decide the next step.
 """

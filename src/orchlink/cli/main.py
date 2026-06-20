@@ -350,6 +350,12 @@ def work_listen(
     asyncio.run(run_worker_loop(config, once=once, console=None, register=True))
 
 
+def print_async_ask_guidance(config: dict[str, Any], worker_id: str, task_id: str) -> None:
+    console.print(f"[Orch] Queued {task_id} for {resolve_agent_id(config, worker_id)}")
+    console.print("[Orch] Async mode: treat this scope as pending until the worker reply arrives.")
+    console.print("[Orch] Continue only on unrelated scope, or use --wait when the next decision depends on the worker.")
+
+
 @app.command()
 def ask(
     worker_id: str,
@@ -385,6 +391,8 @@ def ask(
         except (RuntimeError, httpx.HTTPError) as exc:
             console.print(f"[Orch] {exc}")
             raise typer.Exit(1) from exc
+    if config_dir is None and not wait:
+        print_async_ask_guidance(config, worker_id, task_id)
     console.print_json(json.dumps(response))
 
 

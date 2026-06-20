@@ -94,7 +94,7 @@ ${message.type || "RESULT"}
 SUMMARY:
 ${summary}
 
-Treat this as part of a working discussion. Compare it with your current plan, decide whether to continue the discussion, split the work, or act on the result.`;
+Treat this as part of a working discussion. If you kept working while this scope was pending, reconcile the worker reply with your current state instead of writing a second independent conclusion. Decide whether to continue the discussion, split the work, or act on the result.`;
 }
 
 function messageText(message: any): string {

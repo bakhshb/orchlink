@@ -65,6 +65,8 @@ def test_project_ask_defaults_to_no_wait(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert '"status": "queued"' in result.output
+    assert "Async mode" in result.output
+    assert "pending" in result.output
 
 
 def test_start_orchestrator_prints_guidance(monkeypatch, tmp_path):

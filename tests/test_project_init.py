@@ -28,7 +28,10 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     lead_skill = paths["lead_skill"].read_text(encoding="utf-8")
     work_skill = paths["work_skill"].read_text(encoding="utf-8")
     assert "not only a task delegate" in lead_skill
-    assert "do not do the same scope yourself" in lead_skill
+    assert "Use normal `orch ask`" in lead_skill
+    assert "Use `orch ask --wait`" in lead_skill
+    assert "mark that scope as pending" in lead_skill
+    assert "Do not do the same scope yourself" in lead_skill
     assert "split the scope explicitly" in lead_skill
     assert "workload split" in work_skill
     assert "WORKLOAD_SPLIT" in work_skill
