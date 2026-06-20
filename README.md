@@ -1,35 +1,30 @@
 # Orchlink
 
-Orchlink lets two local Pi coding-agent sessions talk through a small Python broker.
+Orchlink connects two visible Pi coding-agent sessions through a local broker.
 
-Daily flow:
+- Terminal 1 runs the lead Pi session.
+- Terminal 2 runs the worker Pi session.
+- The lead sends a task with `orch ask`.
+- The worker receives the task inside its Pi chat and replies from that chat.
 
-```bash
-orch init          # once per project
-orch lead          # terminal 1
-orch work          # terminal 2
-orch ask work -t T001 -m "Inspect the project and return PLAN only."
-orch watch         # optional terminal 3
-```
+## Requirements
 
-The broker starts automatically for `lead`, `work`, `ask`, and `watch` when `.orch/project.yaml` has `broker.auto_start: true`.
+- Python 3.11+
+- `git`
+- Pi installed and available as `pi`
 
 ## Install
-
-### One-line install
-
-Install with:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh | bash
 ```
 
-The installer:
+The installer creates an isolated venv under `~/.local/share/orchlink` and links these commands into `~/.local/bin`:
 
-- clones/updates Orchlink under `~/.local/share/orchlink`
-- creates an isolated Python venv at `~/.local/share/orchlink/.venv`
-- installs the package into that venv
-- links `orch` and `orchlink` into `~/.local/bin`
+```text
+orch
+orchlink
+```
 
 If your shell cannot find `orch`, add this to your shell profile:
 
@@ -37,40 +32,62 @@ If your shell cannot find `orch`, add this to your shell profile:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Advanced install options:
+Installer options:
 
 ```bash
-# Install from a specific repo/ref
-curl -fsSL https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh | \
-  bash -s -- --repo https://github.com/bakhshb/orchlink.git --ref main
+INSTALL_URL="https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh"
 
-# Custom install location
-curl -fsSL https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh | \
-  bash -s -- --dir ~/.local/share/orchlink --bin-dir ~/.local/bin
+# Install a specific branch, tag, or commit
+curl -fsSL "$INSTALL_URL" | bash -s -- --ref main
 
-# Remove the installed copy
-curl -fsSL https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh | bash -s -- --uninstall
+# Use a custom install or bin directory
+curl -fsSL "$INSTALL_URL" | bash -s -- --dir ~/.local/share/orchlink --bin-dir ~/.local/bin
+
+# Uninstall
+curl -fsSL "$INSTALL_URL" | bash -s -- --uninstall
 ```
 
-### Developer install
+## Quick start
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-`pyproject.toml` exposes both `orch` and the legacy `orchlink` command.
-
-## Project setup
-
-Run inside the project you want the two Pi sessions to work on:
+Run these commands inside the project where you want the two Pi sessions to work.
 
 ```bash
 orch init
 ```
 
-This creates:
+Open the lead session:
+
+```bash
+orch lead
+```
+
+Open the worker session in another terminal:
+
+```bash
+orch work
+```
+
+Send a task from the lead session, or from any shell in the same project:
+
+```bash
+orch ask work -t T001 -m "Inspect the project and return PLAN only."
+```
+
+Watch broker events if you want a third terminal:
+
+```bash
+orch watch
+```
+
+Stop the project broker:
+
+```bash
+orch stop
+```
+
+## Project files
+
+`orch init` creates:
 
 ```text
 .orch/project.yaml
@@ -79,48 +96,27 @@ This creates:
 .orch/run/
 ```
 
-The default project id is the current folder name. The default agents are `<project_id>.lead` and `<project_id>.work`.
+The default project id comes from the folder name. The default agent ids are:
+
+```text
+<project_id>.lead
+<project_id>.work
+```
 
 ## Commands
 
-```bash
-orch lead
-```
+| Command | Purpose |
+| --- | --- |
+| `orch init` | Create `.orch/` config and role instructions. |
+| `orch lead` | Start the visible lead Pi session. |
+| `orch work` | Start the visible worker Pi session. |
+| `orch work --no-pi` | Run the worker listener without opening Pi. |
+| `orch ask work -t T001 -m "..."` | Send a task to the worker and wait for the reply. |
+| `orch watch` | Show queued tasks, delivered tasks, replies, and timeouts. |
+| `orch stop` | Stop the project broker and worker listener. |
+| `orch doctor` | Check local setup. |
 
-Registers the lead and launches a visible Pi lead session with the lead instructions.
-
-```bash
-orch work
-```
-
-Registers the worker and opens the visible Pi worker session. Incoming tasks are posted directly into that Pi chat; the worker's visible assistant response is returned to the lead.
-
-For debugging without opening Pi:
-
-```bash
-orch work --no-pi
-```
-
-```bash
-orch ask work --task T001 --msg "Return PLAN only."
-```
-
-Sends a TASK to the worker and waits for PLAN, RESULT, or BLOCKER.
-
-```bash
-orch watch
-```
-
-Shows broker events such as queued tasks, delivered tasks, replies, and timeouts.
-
-```bash
-orch stop
-orch doctor
-```
-
-Stops the project broker PID or checks local setup.
-
-For debugging:
+For broker debugging:
 
 ```bash
 orch broker run --host 127.0.0.1 --port 8787
@@ -128,7 +124,7 @@ orch broker run --host 127.0.0.1 --port 8787
 
 ## Configuration
 
-Project settings live in:
+Edit project settings in:
 
 ```text
 .orch/project.yaml
@@ -139,13 +135,11 @@ To change the broker port, update both `broker.url` and `broker.port`:
 ```yaml
 broker:
   url: http://127.0.0.1:8788
-  api_key: change-me
-  auto_start: true
   host: 127.0.0.1
   port: 8788
 ```
 
-Then restart the project broker and sessions:
+Then restart:
 
 ```bash
 orch stop
@@ -153,37 +147,42 @@ orch lead
 orch work
 ```
 
-## Pi connector
-
-By default Orchlink calls:
-
-```bash
-pi --session-id lead ...
-pi --session-id work ...              # visible worker session with Orchlink extension
-pi --print --session-id work ...      # fallback/debug worker task execution
-```
-
-You can change the executable in `.orch/project.yaml`:
+To change the Pi executable:
 
 ```yaml
 pi:
   command: pi
 ```
 
-If the command is missing, the worker returns a BLOCKER explaining that the Pi command must be installed or configured.
+By default, Orchlink starts Pi with named sessions:
 
-## Security notes
+```bash
+pi --session-id lead ...
+pi --session-id work ...
+```
 
+The worker session loads an Orchlink Pi extension, so incoming tasks appear in the visible worker chat.
+
+## Security
+
+- The broker binds to `127.0.0.1` by default.
 - `/health` is public.
 - `/v1/*` endpoints require `X-API-Key`.
-- API keys are stored in `.orch/project.yaml` by default.
+- Orchlink stores the broker API key in `.orch/project.yaml`.
 - `.env` files are not required.
-- `.orch/` is project-local runtime config and should not be committed.
-- The default `change-me` key is only for local development.
-- The broker binds to `127.0.0.1` by default.
-- API keys are not printed by the CLI.
+- `.orch/` contains project-local runtime config and should not be committed.
+- `change-me` is for local development only.
+- The CLI does not print API keys.
 
-## Tests
+## Development
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Run checks:
 
 ```bash
 python3 -c "import pytest, sys; sys.exit(pytest.main(['tests', '-v']))"
