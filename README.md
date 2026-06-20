@@ -149,6 +149,9 @@ If the command is missing, the worker returns a BLOCKER explaining that the Pi c
 
 - `/health` is public.
 - `/v1/*` endpoints require `X-API-Key`.
+- API keys are stored in `.orch/project.yaml` by default.
+- `.env` files are not required.
+- `.orch/` is project-local runtime config and should not be committed.
 - The default `change-me` key is only for local development.
 - The broker binds to `127.0.0.1` by default.
 - API keys are not printed by the CLI.
