@@ -126,6 +126,33 @@ For debugging:
 orch broker run --host 127.0.0.1 --port 8787
 ```
 
+## Configuration
+
+Project settings live in:
+
+```text
+.orch/project.yaml
+```
+
+To change the broker port, update both `broker.url` and `broker.port`:
+
+```yaml
+broker:
+  url: http://127.0.0.1:8788
+  api_key: change-me
+  auto_start: true
+  host: 127.0.0.1
+  port: 8788
+```
+
+Then restart the project broker and sessions:
+
+```bash
+orch stop
+orch lead
+orch work
+```
+
 ## Pi connector
 
 By default Orchlink calls:
