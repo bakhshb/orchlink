@@ -57,6 +57,26 @@ app.add_typer(broker_app, name="broker")
 console = Console()
 
 
+def print_orch_exception(exc: Exception) -> None:
+    if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            detail = exc.response.json().get("detail")
+        except ValueError:
+            detail = None
+        if isinstance(detail, dict):
+            console.print(f"[Orch] {detail.get('message') or detail.get('error') or exc}")
+            if detail.get("blocking_id"):
+                console.print(
+                    f"[Orch] Blocking work: {detail.get('blocking_id')} "
+                    f"({detail.get('blocking_kind', 'work')} {detail.get('blocking_status', '')})"
+                )
+            return
+        if detail:
+            console.print(f"[Orch] {detail}")
+            return
+    console.print(f"[Orch] {exc}")
+
+
 def resolve_config_dir(config_dir: Path | None = None) -> Path:
     if config_dir is not None:
         return config_dir
@@ -470,7 +490,7 @@ def ask(
                 wait=wait,
             )
         except (RuntimeError, httpx.HTTPError) as exc:
-            console.print(f"[Orch] {exc}")
+            print_orch_exception(exc)
             raise typer.Exit(1) from exc
     if config_dir is None and not wait:
         print_async_guidance(config, worker_id, task_id)
@@ -503,7 +523,7 @@ def send(
             timeout_seconds=timeout_seconds,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
-        console.print(f"[Orch] {exc}")
+        print_orch_exception(exc)
         raise typer.Exit(1) from exc
     print_async_guidance(config, worker_id, task_id)
 
@@ -604,7 +624,7 @@ def talk(
             wait=False,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
-        console.print(f"[Orch] {exc}")
+        print_orch_exception(exc)
         raise typer.Exit(1) from exc
     console.print(f"[Orch] Started conversation {conversation_id} with {worker_id}.")
     console.print(f"[Orch] Max turns: {rounds}")
@@ -644,7 +664,7 @@ def say(
             timeout_seconds=timeout_seconds,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
-        console.print(f"[Orch] {exc}")
+        print_orch_exception(exc)
         raise typer.Exit(1) from exc
     console.print(f"[Orch] Sent turn {turn}/{max_turns} to work for {conversation_id}.")
     console.print("[Orch] Waiting for worker reply in the lead Pi chat.")
@@ -676,7 +696,7 @@ def close(
             timeout_seconds=timeout_seconds,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
-        console.print(f"[Orch] {exc}")
+        print_orch_exception(exc)
         raise typer.Exit(1) from exc
     console.print(f"[Orch] Closed conversation {conversation_id}.")
     if message:

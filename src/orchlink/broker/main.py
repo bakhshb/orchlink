@@ -5,7 +5,7 @@ from fastapi.security import APIKeyHeader
 
 from orchlink.broker.protocol import AgentRegistration, MessageEnvelope, envelope_to_dict
 from orchlink.broker.settings import Settings, get_settings
-from orchlink.broker.storage import MemoryMessageStore, MessageStore
+from orchlink.broker.storage import MemoryMessageStore, MessageStore, MessageStoreBusy
 
 
 VERSION = "0.1.0"
@@ -55,6 +55,8 @@ def create_app(
     ) -> dict[str, str]:
         try:
             return await message_store.enqueue_message(envelope_to_dict(message))
+        except MessageStoreBusy as exc:
+            raise HTTPException(status_code=409, detail=exc.detail) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -65,6 +67,8 @@ def create_app(
     ) -> dict[str, Any]:
         try:
             await message_store.enqueue_message(envelope_to_dict(message), create_waiter=True)
+        except MessageStoreBusy as exc:
+            raise HTTPException(status_code=409, detail=exc.detail) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return await message_store.wait_for_reply(

@@ -2,10 +2,12 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-from orchlink.broker.storage.base import MessageStore
+from orchlink.broker.storage.base import MessageStore, MessageStoreBusy
 
 
 FAILED_STATUSES = {"FAILED", "TIMEOUT", "CANCELLED"}
+BUSY_MESSAGE_STATUSES = {"PENDING", "QUEUED", "DELIVERED", "RUNNING", "IN_PROGRESS"}
+WORKER_BOUND_TYPES = {"TASK", "CHAT_START", "CHAT_TURN", "CHAT_CLOSE"}
 
 
 class MemoryMessageStore(MessageStore):
@@ -158,6 +160,45 @@ class MemoryMessageStore(MessageStore):
         if current_turn >= max_turns:
             raise ValueError(f"Conversation reached max turns: {conversation_id}")
 
+    def _busy_detail(self, blocker: dict[str, Any], message: dict[str, Any]) -> dict[str, Any]:
+        blocking_id = blocker.get("task_id") or blocker.get("conversation_id") or blocker.get("message_id")
+        return {
+            "error": "worker_busy",
+            "message": "Worker already has pending work. Wait for that reply before sending another task or talk turn.",
+            "blocking_id": blocking_id,
+            "blocking_kind": blocker.get("kind") or ("conversation" if blocker.get("conversation_id") and not blocker.get("task_id") else "task"),
+            "blocking_status": blocker.get("status"),
+            "blocking_type": blocker.get("message_type") or blocker.get("type"),
+            "requested_type": message.get("type"),
+            "requested_task_id": message.get("task_id"),
+            "requested_conversation_id": message.get("conversation_id"),
+        }
+
+    def _assert_worker_lane_free_locked(self, message: dict[str, Any]) -> None:
+        message_type = str(message.get("type") or "")
+        if message_type not in WORKER_BOUND_TYPES:
+            return
+
+        to_agent = message.get("to_agent")
+        for active in self._active_messages.values():
+            if active.get("to_agent") != to_agent:
+                continue
+            if str(active.get("status") or "").upper() not in BUSY_MESSAGE_STATUSES:
+                continue
+            raise MessageStoreBusy(self._busy_detail(active, message))
+
+        conversation_id = str(message.get("conversation_id") or "")
+        if message_type in {"CHAT_TURN", "CHAT_CLOSE"}:
+            return
+        for conversation in self._conversations.values():
+            if conversation.get("status") != "OPEN":
+                continue
+            if to_agent not in conversation.get("participants", []):
+                continue
+            if conversation.get("conversation_id") == conversation_id:
+                continue
+            raise MessageStoreBusy(self._busy_detail(conversation, message))
+
     def _resolve_task_waiters_locked(self, task_id: str, result: dict[str, Any]) -> None:
         waiters = self._task_waiters.pop(task_id, [])
         for future in waiters:
@@ -190,6 +231,7 @@ class MemoryMessageStore(MessageStore):
 
         async with self._lock:
             self._assert_conversation_can_receive_locked(message)
+            self._assert_worker_lane_free_locked(message)
             stored_message = dict(message)
             stored_message["status"] = "CLOSED" if message.get("type") == "CHAT_CLOSE" else "QUEUED"
             self._active_messages[message_id] = stored_message

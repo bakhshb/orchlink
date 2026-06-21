@@ -80,6 +80,36 @@ def test_send_message_queues_without_waiting():
     assert next_response.json()["status"] == "message"
 
 
+def test_broker_rejects_second_worker_message_while_busy():
+    client = make_client()
+    first = {
+        "protocol": "orch-a2a-v1",
+        "message_id": "msg-0001",
+        "correlation_id": "req-0001",
+        "project_id": "test",
+        "conversation_id": "test-default",
+        "task_id": "T001",
+        "from_agent": "test.lead",
+        "to_agent": "test.work",
+        "type": "TASK",
+        "status": "PENDING",
+        "turn": 1,
+        "max_turns": 6,
+        "requires_reply": True,
+        "timeout_seconds": 1800,
+        "payload": {"intent": "Return PLAN only."},
+    }
+    second = {**first, "message_id": "msg-0002", "correlation_id": "req-0002", "task_id": "T002"}
+
+    first_response = client.post("/v1/messages/send", headers=auth_headers(), json=first)
+    second_response = client.post("/v1/messages/send", headers=auth_headers(), json=second)
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 409
+    assert second_response.json()["detail"]["error"] == "worker_busy"
+    assert second_response.json()["detail"]["blocking_id"] == "T001"
+
+
 def test_chat_start_creates_conversation_job():
     client = make_client()
     message = {

@@ -44,11 +44,13 @@ orch jobs
 orch get T002
 orch wait T002
 
-Check whether worker has pending work before dependent tests or final summary:
+Check whether worker has pending work before dependent tests, a new worker assignment, or final summary:
 
 orch idle
 
 `T002` is a task ID. `C001` is a conversation ID. Do not use `orch get C001` to read a Talk Mode reply; read the reply in the lead Pi chat, then use `orch say C001` or `orch close C001`.
+
+The worker lane is single-flight. Do not stack two worker tasks. Wait for the current worker reply, or close the current talk, before sending another task.
 
 ## If the user says "talk with work"
 
@@ -122,7 +124,7 @@ orch ask work --wait -t R001 -m "MODE: REVIEW. Review my changes. Do not edit fi
 
 Only use async review with `orch send --allow-async-review` when you will work on unrelated scope and will not act on the review until it returns.
 
-Before a long full-test run or final conclusion, run `orch idle`. If it says worker is not idle, tell the user you are waiting for work's response and do not proceed.
+Before a long full-test run, final conclusion, or another worker assignment, run `orch idle`. If it says worker is not idle, tell the user you are waiting for work's response and do not proceed.
 
 After worker review arrives, do a critical pass before testing: decide whether the review is clean, risky, blocked, or needs a follow-up. If you are not satisfied, use Talk Mode or another review question before running full tests.
 
@@ -143,6 +145,7 @@ Every `orch ask` or `orch send` task should include:
 
 - Do not send vague tasks.
 - Ask for PLAN before risky implementation.
+- Do not stack worker tasks. The worker lane is single-flight.
 - Do not work on the same scope as async worker work.
 - Do not run dependent full tests before worker review returns.
 - Run `orch idle` before expensive tests or final conclusions.

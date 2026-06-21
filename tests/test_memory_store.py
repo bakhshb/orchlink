@@ -1,5 +1,8 @@
 import asyncio
 
+import pytest
+
+from orchlink.broker.storage import MessageStoreBusy
 from orchlink.broker.storage.memory import MemoryMessageStore
 
 
@@ -80,6 +83,34 @@ def test_enqueue_then_get_next_message():
     asyncio.run(run())
 
 
+def test_worker_lane_rejects_second_task_until_reply():
+    async def run():
+        store = MemoryMessageStore()
+        await store.enqueue_message(task_message())
+        second = task_message(message_id="msg-0002", correlation_id="req-0002", task_id="TEST-002")
+
+        with pytest.raises(MessageStoreBusy) as exc:
+            await store.enqueue_message(second)
+
+        assert exc.value.detail["error"] == "worker_busy"
+        assert exc.value.detail["blocking_id"] == "TEST-001"
+
+    asyncio.run(run())
+
+
+def test_worker_lane_accepts_next_task_after_reply():
+    async def run():
+        store = MemoryMessageStore()
+        await store.enqueue_message(task_message())
+        await store.save_reply("msg-0001", reply_message())
+
+        queued = await store.enqueue_message(task_message(message_id="msg-0002", correlation_id="req-0002", task_id="TEST-002"))
+
+        assert queued == {"status": "queued", "message_id": "msg-0002"}
+
+    asyncio.run(run())
+
+
 def test_get_next_message_returns_none_after_wait_timeout():
     async def run():
         store = MemoryMessageStore()
@@ -87,6 +118,40 @@ def test_get_next_message_returns_none_after_wait_timeout():
         received = await store.get_next_message("worker-backend", wait_seconds=0)
 
         assert received is None
+
+    asyncio.run(run())
+
+
+def test_open_conversation_blocks_new_task_to_worker():
+    async def run():
+        store = MemoryMessageStore()
+        chat = task_message(
+            message_id="msg-chat",
+            conversation_id="C001",
+            task_id=None,
+            type="CHAT_START",
+            delivery="conversation",
+            payload={"mode": "TALK", "topic": "Repo?", "message": "What do you think?"},
+        )
+        await store.enqueue_message(chat)
+        await store.save_reply(
+            "msg-chat",
+            {
+                **reply_message(),
+                "message_id": "reply-chat",
+                "conversation_id": "C001",
+                "task_id": None,
+                "type": "CHAT_REPLY",
+                "status": "DONE",
+                "delivery": "conversation",
+                "payload": {"mode": "TALK", "summary": "Looks good."},
+            },
+        )
+
+        with pytest.raises(MessageStoreBusy) as exc:
+            await store.enqueue_message(task_message(message_id="msg-0002", correlation_id="req-0002", task_id="TEST-002"))
+
+        assert exc.value.detail["blocking_id"] == "C001"
 
     asyncio.run(run())
 

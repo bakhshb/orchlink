@@ -120,7 +120,9 @@ Use this for decision gates. Use `orch send` for independent work.
 
 Worker REVIEW is a gate by default. If a review can change the next action, use `orch ask --wait`; do not start full tests or release steps until the review result arrives. `orch send` rejects `MODE: REVIEW` unless you pass `--allow-async-review` for an unrelated, non-gating review.
 
-Before long tests or a final conclusion, run `orch idle`. If worker is not idle, wait for the reply first. After review arrives, think critically about it; ask a follow-up or use Talk Mode if the answer raises risk.
+Before long tests, another worker assignment, or a final conclusion, run `orch idle`. If worker is not idle, wait for the reply first. After review arrives, think critically about it; ask a follow-up or use Talk Mode if the answer raises risk.
+
+The worker lane is single-flight. Orchlink rejects a second worker task or new talk while the worker already has pending work. This keeps lead from stacking tasks and concluding before worker results arrive.
 
 ## Skills and project files
 

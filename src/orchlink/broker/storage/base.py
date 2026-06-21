@@ -2,6 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 
+class MessageStoreBusy(RuntimeError):
+    def __init__(self, detail: dict[str, Any]) -> None:
+        self.detail = detail
+        super().__init__(str(detail.get("message") or "Worker is busy."))
+
+
 class MessageStore(ABC):
     @abstractmethod
     async def register_agent(self, agent: dict[str, Any]) -> dict[str, Any]:
