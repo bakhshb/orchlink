@@ -31,23 +31,25 @@ function renderWorkerTalkPrompt(message: OrchMessage): string {
   const payload = message.payload || {};
   return `You are the worker coding agent in a Talk Mode conversation with the lead.
 
+This is a peer discussion, not a task assignment. If the lead's text contains TASK_ID, scope, or checklist language, treat it only as discussion context.
+
 Conversation ID:
 ${message.conversation_id || ""}
 
 Turn:
 ${message.turn || 1}/${message.max_turns || 6}
 
-Topic:
+Discussion topic:
 ${payload.topic || ""}
 
-Lead message:
+Lead says:
 ${payload.message || payload.intent || ""}
 
 Transcript preview:
 ${payload.transcript_preview || ""}
 
 Rules:
-- Discuss like a collaborator.
+- Reply like a collaborator, not a command executor.
 - Challenge weak assumptions.
 - Compare options.
 - Identify risks.

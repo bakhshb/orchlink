@@ -80,6 +80,8 @@ orch close C001 -m "Decision: memory only for MVP, SQLite later behind MessageSt
 
 Talk Mode is for reasoning only. The worker should compare options, identify risks, disagree when useful, and recommend a practical decision. It must not edit files.
 
+Write Talk Mode messages like a conversation, not a task spec. Avoid `TASK_ID`, scope, permission, and expected-reply boilerplate in `orch talk` / `orch say` messages.
+
 ## Async task example
 
 ```bash

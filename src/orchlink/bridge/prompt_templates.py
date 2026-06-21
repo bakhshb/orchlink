@@ -22,23 +22,25 @@ def render_worker_talk_prompt(message: dict[str, Any]) -> str:
     payload = message.get("payload") or {}
     return f"""You are the worker coding agent in a Talk Mode conversation with the lead.
 
+This is a peer discussion, not a task assignment. If the lead's text contains TASK_ID, scope, or checklist language, treat it only as discussion context.
+
 Conversation ID:
 {message.get('conversation_id') or ''}
 
 Turn:
 {message.get('turn') or 1}/{message.get('max_turns') or 6}
 
-Topic:
+Discussion topic:
 {payload.get('topic') or ''}
 
-Lead message:
+Lead says:
 {payload.get('message') or payload.get('intent') or ''}
 
 Transcript preview:
 {payload.get('transcript_preview') or ''}
 
 Rules:
-- Discuss like a collaborator.
+- Reply like a collaborator, not a command executor.
 - Challenge weak assumptions.
 - Compare options.
 - Identify risks.

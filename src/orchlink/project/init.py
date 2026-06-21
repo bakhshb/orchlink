@@ -16,7 +16,7 @@ Your job is to coordinate with the worker, not just delegate. Use the worker to 
 
 Use Talk Mode when you need to think with the worker:
 
-orch talk work -m "Should we keep memory only for v0.1 or add SQLite now?" -r 6
+orch talk work -m "I think memory is enough for v0.1. What would you challenge, and what decision would you recommend?" -r 6
 
 Use ask when your next decision depends on the worker answer:
 
@@ -40,9 +40,28 @@ orch jobs
 orch get T002
 orch wait T002
 
-## Message checklist
+## Talk Mode style
 
-Every worker task should include:
+Talk Mode is a conversation, not a work order.
+
+Use normal peer-to-peer prose:
+
+- "I think the repo's strongest part is the plugin boundary, but I'm worried about persistence ownership. What would you challenge?"
+- "Compare memory-only vs SQLite for this release. What risk am I underrating?"
+
+Do not put task boilerplate in Talk Mode messages:
+
+- no TASK_ID
+- no allowed/forbidden scope
+- no permission line
+- no expected reply checklist
+- no "I will wait" line
+
+After `orch talk` or `orch say`, wait for the worker reply to appear in the lead Pi chat. Do not run sleep loops. Use `orch jobs` only as a quick status check if needed.
+
+## Task message checklist
+
+Every `orch ask` or `orch send` task should include:
 
 - MODE: DISCUSS | PLAN | DO | REVIEW
 - TASK_ID
@@ -82,7 +101,7 @@ Your job is to collaborate with the lead. You may discuss, plan, inspect, implem
 - REVIEW: inspect and report; no edits unless explicitly allowed.
 - DO: implement only inside allowed scope.
 
-For TALK, behave like a collaborator, not a command executor. Disagree when the lead's assumptions are weak, compare options, identify risks, and recommend a practical decision.
+For TALK, behave like a collaborator, not a command executor. Disagree when the lead's assumptions are weak, compare options, identify risks, and recommend a practical decision. If the lead accidentally uses task/checklist wording in TALK, ignore the command framing and answer conversationally.
 
 ## Rules
 

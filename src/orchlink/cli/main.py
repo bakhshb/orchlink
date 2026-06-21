@@ -580,7 +580,8 @@ def talk(
         raise typer.Exit(1) from exc
     console.print(f"[Orch] Started conversation {conversation_id} with {worker_id}.")
     console.print(f"[Orch] Max turns: {rounds}")
-    console.print("[Orch] Waiting for worker reply in the lead Pi chat...")
+    console.print("[Orch] Waiting for worker reply in the lead Pi chat.")
+    console.print("[Orch] Do not poll or sleep; continue only with: orch say " + conversation_id + " -m \"...\"")
 
 
 @app.command()
@@ -617,7 +618,8 @@ def say(
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
     console.print(f"[Orch] Sent turn {turn}/{max_turns} to work for {conversation_id}.")
-    console.print("[Orch] Waiting for worker reply in the lead Pi chat...")
+    console.print("[Orch] Waiting for worker reply in the lead Pi chat.")
+    console.print("[Orch] Do not poll or sleep; continue only after the reply arrives.")
 
 
 @app.command()

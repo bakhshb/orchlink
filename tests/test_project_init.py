@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from orchlink.bridge.ask import build_task_envelope
+from orchlink.bridge.ask import build_chat_envelope, build_task_envelope
 from orchlink.cli.main import app
 from orchlink.project.config import load_project_config
 from orchlink.project.init import init_project
@@ -28,16 +28,19 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     lead_skill = paths["lead_skill"].read_text(encoding="utf-8")
     work_skill = paths["work_skill"].read_text(encoding="utf-8")
     assert "not just delegate" in lead_skill
-    assert "Message checklist" in lead_skill
+    assert "Task message checklist" in lead_skill
     assert "orch talk work" in lead_skill
     assert "orch ask work --wait" in lead_skill
     assert "orch send work" in lead_skill
     assert "orch say C001" in lead_skill
     assert "orch close C001" in lead_skill
+    assert "Talk Mode is a conversation" in lead_skill
+    assert "no TASK_ID" in lead_skill
     assert "MODE: DISCUSS | PLAN | DO | REVIEW" in lead_skill
     assert "## Modes" in work_skill
     assert "TALK: discuss" in work_skill
     assert "For TALK, behave like a collaborator" in work_skill
+    assert "ignore the command framing" in work_skill
     assert "TYPE: CHAT_REPLY" in work_skill
 
 
@@ -50,7 +53,7 @@ def test_refresh_skills_keeps_existing_project_config(tmp_path):
     refreshed = init_project(tmp_path, refresh_skills=True)
 
     assert refreshed["config"].read_text(encoding="utf-8") == "project_id: custom\n"
-    assert "Message checklist" in refreshed["lead_skill"].read_text(encoding="utf-8")
+    assert "Task message checklist" in refreshed["lead_skill"].read_text(encoding="utf-8")
     assert "## Modes" in refreshed["work_skill"].read_text(encoding="utf-8")
 
 
@@ -66,6 +69,19 @@ def test_cli_init_uses_current_folder_name_by_default(monkeypatch, tmp_path):
     assert config["project_id"] == "sample-project"
     assert (project_dir / ".orch" / "skills" / "lead.md").is_file()
     assert (project_dir / ".orch" / "skills" / "work.md").is_file()
+
+
+def test_chat_envelope_summarizes_topic_without_duplicating_full_message(tmp_path):
+    init_project(tmp_path, project_id="demo")
+    config = load_project_config(tmp_path)
+    long_message = "MODE: DISCUSS\nTASK_ID: SHOULD_NOT_BECOME_TOPIC\n" + ("x" * 180)
+
+    envelope = build_chat_envelope(config, "work", "C001", long_message)
+
+    assert envelope["type"] == "CHAT_START"
+    assert envelope["delivery"] == "conversation"
+    assert envelope["payload"]["topic"] == "MODE: DISCUSS"
+    assert envelope["payload"]["message"] == long_message
 
 
 def test_project_ask_envelope_resolves_work_alias(tmp_path):

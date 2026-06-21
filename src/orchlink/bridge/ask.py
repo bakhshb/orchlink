@@ -35,6 +35,14 @@ TALK_EXPECTED_REPLY = [
 VALID_TASK_MODES = {"DISCUSS", "PLAN", "DO", "REVIEW"}
 
 
+def summarize_chat_topic(message: str, limit: int = 120) -> str:
+    for line in message.splitlines():
+        cleaned = line.strip()
+        if cleaned:
+            return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 1]}…"
+    return "Talk Mode conversation"
+
+
 def infer_task_mode(message: str, default: str = "PLAN") -> str:
     match = re.search(r"(?im)^\s*MODE\s*:\s*(DISCUSS|PLAN|DO|REVIEW)\b", message)
     if match:
@@ -116,7 +124,7 @@ def build_chat_envelope(
         "delivery": "conversation",
         "payload": {
             "mode": "TALK",
-            "topic": message if message_type == "CHAT_START" else "",
+            "topic": summarize_chat_topic(message) if message_type == "CHAT_START" else "",
             "message": message,
             "transcript_preview": transcript_preview,
             "constraints": [
