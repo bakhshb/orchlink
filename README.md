@@ -1,17 +1,21 @@
 # Orchlink
 
-Orchlink connects two visible Pi coding-agent sessions through a local broker.
+Orchlink lets two visible Pi coding-agent sessions talk to each other through a local broker.
 
-- Terminal 1 runs the lead Pi session.
-- Terminal 2 runs the worker Pi session.
-- The lead sends a task with `orch ask`.
-- The worker receives the task inside its Pi chat and replies from that chat.
+You use two terminals:
+
+```text
+Terminal 1: lead Pi session
+Terminal 2: worker Pi session
+```
+
+You talk to the lead. The lead can send messages to the worker. The worker receives those messages inside its own Pi chat and replies back to the lead chat.
 
 ## Requirements
 
 - Python 3.11+
 - `git`
-- Pi installed and available as `pi`
+- Pi installed as `pi`
 
 ## Install
 
@@ -19,12 +23,7 @@ Orchlink connects two visible Pi coding-agent sessions through a local broker.
 curl -fsSL https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh | bash
 ```
 
-The installer creates an isolated venv under `~/.local/share/orchlink` and links these commands into `~/.local/bin`:
-
-```text
-orch
-orchlink
-```
+The installer creates its own venv in `~/.local/share/orchlink` and links `orch` into `~/.local/bin`.
 
 If your shell cannot find `orch`, add this to your shell profile:
 
@@ -32,93 +31,83 @@ If your shell cannot find `orch`, add this to your shell profile:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Installer options:
+## First run
+
+Go to the project where you want the two Pi sessions to work:
 
 ```bash
-INSTALL_URL="https://raw.githubusercontent.com/bakhshb/orchlink/main/install.sh"
-
-# Install a specific branch, tag, or commit
-curl -fsSL "$INSTALL_URL" | bash -s -- --ref main
-
-# Use a custom install or bin directory
-curl -fsSL "$INSTALL_URL" | bash -s -- --dir ~/.local/share/orchlink --bin-dir ~/.local/bin
-
-# Uninstall
-curl -fsSL "$INSTALL_URL" | bash -s -- --uninstall
-```
-
-Update later:
-
-```bash
-orch update
-```
-
-Use a specific branch, tag, or commit:
-
-```bash
-orch update --ref main
-```
-
-## Quick start
-
-Run these commands inside the project where you want the two Pi sessions to work.
-
-```bash
+cd /path/to/your/project
 orch init
 ```
 
-Open the lead session:
+Start the lead in terminal 1:
 
 ```bash
 orch lead
 ```
 
-Open the worker session in another terminal:
+Start the worker in terminal 2:
 
 ```bash
 orch work
 ```
 
-These commands reopen the saved Pi sessions for the project. Start clean Pi histories when you need them:
+Now talk to the lead Pi session. Ask it to collaborate with the worker when useful.
+
+Example message to the lead:
+
+```text
+Inspect this project. Discuss the workload with the worker first, then propose a plan.
+```
+
+The lead can send the worker a message with:
+
+```bash
+orch ask work -t PLAN-001 -m "Review the workload, identify risks, and propose how lead and worker should split this. Return PLAN only."
+```
+
+The worker reply appears back in the lead Pi chat.
+
+## Daily commands
+
+Use these most of the time:
+
+| Command | Use |
+| --- | --- |
+| `orch init` | Set up Orchlink in the current project. Run once. |
+| `orch lead` | Open the lead Pi session. |
+| `orch work` | Open the worker Pi session. |
+| `orch ask work -t T001 -m "..."` | Queue a message for the worker. |
+| `orch stop` | Stop the project broker. |
+
+## How `orch ask` works
+
+Default mode is async:
+
+```bash
+orch ask work -t T001 -m "Inspect auth and return PLAN."
+```
+
+Use this when the lead can work on a different scope while the worker thinks. The lead should treat the worker's scope as pending until the reply arrives.
+
+Use `--wait` when the next lead decision depends on the worker reply:
+
+```bash
+orch ask work --wait -t T001 -m "Inspect auth and return PLAN."
+```
+
+## Fresh Pi sessions
+
+By default, `orch lead` and `orch work` reopen the saved Pi histories named `lead` and `work`.
+
+Start clean histories when needed:
 
 ```bash
 orch lead --new
 orch work --new
 ```
 
-Send a task from the lead session, or from any shell in the same project:
-
-```bash
-orch ask work -t T001 -m "Inspect the project and return PLAN only."
-```
-
-`orch ask` queues the message and returns immediately. Use it when the lead can continue on unrelated scope while the worker thinks. The lead should treat the worker's scope as pending until the reply arrives.
-
-If the next lead decision depends on the worker reply, wait explicitly:
-
-```bash
-orch ask work --wait -t T001 -m "Inspect the project and return PLAN only."
-```
-
-Use Orchlink for discussion too, not just delegation:
-
-```bash
-orch ask work -t PLAN-001 -m "Review the workload, identify risks, and propose how lead and worker should split this. Return PLAN only."
-```
-
-Watch broker events if you want a third terminal:
-
-```bash
-orch watch
-```
-
-Stop the project broker:
-
-```bash
-orch stop
-```
-
-## Project files
+## Skills and project files
 
 `orch init` creates:
 
@@ -129,52 +118,33 @@ orch stop
 .orch/run/
 ```
 
+You do not run the skill files. Orchlink loads them into Pi so the lead and worker know their roles.
+
 Refresh the role instructions without changing project config:
 
 ```bash
 orch init --refresh-skills
 ```
 
-The default project id comes from the folder name. The default agent ids are:
+## Other useful commands
 
-```text
-<project_id>.lead
-<project_id>.work
-```
-
-## Commands
-
-| Command | Purpose |
+| Command | Use |
 | --- | --- |
-| `orch init` | Create `.orch/` config and role instructions. |
-| `orch init --refresh-skills` | Refresh lead/work instructions without changing `.orch/project.yaml`. |
-| `orch lead` | Start the visible lead Pi session. Reopens the saved `lead` Pi session. |
-| `orch lead --new` | Start a new visible lead Pi session. |
-| `orch work` | Start the visible worker Pi session. Reopens the saved `work` Pi session. |
-| `orch work --new` | Start a new visible worker Pi session. |
-| `orch work --no-pi` | Run the worker listener without opening Pi. |
-| `orch ask work -t T001 -m "..."` | Queue a task for the worker. |
-| `orch ask work --wait -t T001 -m "..."` | Send a task and block until the reply arrives. |
-| `orch watch` | Show queued tasks, delivered tasks, replies, and timeouts. |
-| `orch stop` | Stop the project broker and worker listener. |
-| `orch doctor` | Check local setup. |
-| `orch update` | Pull the latest Orchlink code and reinstall it into the venv. |
-
-For broker debugging:
-
-```bash
-orch broker run --host 127.0.0.1 --port 8787
-```
+| `orch watch` | Show broker events in a third terminal. |
+| `orch doctor` | Check setup. |
+| `orch update` | Pull the latest Orchlink code and reinstall it. |
+| `orch work --no-pi` | Run the worker listener without opening Pi. Debug only. |
+| `orch broker run --host 127.0.0.1 --port 8787` | Run the broker manually. Debug only. |
 
 ## Configuration
 
-Edit project settings in:
+Project settings live in:
 
 ```text
 .orch/project.yaml
 ```
 
-To change the broker port, update both `broker.url` and `broker.port`:
+Change the broker port by updating both `broker.url` and `broker.port`:
 
 ```yaml
 broker:
@@ -191,30 +161,20 @@ orch lead
 orch work
 ```
 
-To change the Pi executable:
+Change the Pi executable if needed:
 
 ```yaml
 pi:
   command: pi
 ```
 
-By default, Orchlink starts Pi with named sessions:
-
-```bash
-pi --session-id lead ...
-pi --session-id work ...
-```
-
-The worker session loads an Orchlink Pi extension, so incoming tasks appear in the visible worker chat.
-
 ## Security
 
 - The broker binds to `127.0.0.1` by default.
-- `/health` is public.
 - `/v1/*` endpoints require `X-API-Key`.
 - Orchlink stores the broker API key in `.orch/project.yaml`.
 - `.env` files are not required.
-- `.orch/` contains project-local runtime config and should not be committed.
+- Do not commit `.orch/`.
 - `change-me` is for local development only.
 - The CLI does not print API keys.
 
