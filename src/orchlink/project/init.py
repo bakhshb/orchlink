@@ -44,6 +44,10 @@ orch jobs
 orch get T002
 orch wait T002
 
+Check whether worker has pending work before dependent tests or final summary:
+
+orch idle
+
 `T002` is a task ID. `C001` is a conversation ID. Do not use `orch get C001` to read a Talk Mode reply; read the reply in the lead Pi chat, then use `orch say C001` or `orch close C001`.
 
 ## If the user says "talk with work"
@@ -118,7 +122,9 @@ orch ask work --wait -t R001 -m "MODE: REVIEW. Review my changes. Do not edit fi
 
 Only use async review with `orch send --allow-async-review` when you will work on unrelated scope and will not act on the review until it returns.
 
-Before a long full-test run, check that no blocking review is pending. If review is pending, wait for it first.
+Before a long full-test run or final conclusion, run `orch idle`. If it says worker is not idle, tell the user you are waiting for work's response and do not proceed.
+
+After worker review arrives, do a critical pass before testing: decide whether the review is clean, risky, blocked, or needs a follow-up. If you are not satisfied, use Talk Mode or another review question before running full tests.
 
 ## Task message checklist
 
@@ -139,6 +145,8 @@ Every `orch ask` or `orch send` task should include:
 - Ask for PLAN before risky implementation.
 - Do not work on the same scope as async worker work.
 - Do not run dependent full tests before worker review returns.
+- Run `orch idle` before expensive tests or final conclusions.
+- After review returns, think critically about the answer before proceeding.
 - Use Talk Mode to challenge assumptions and compare options.
 - Close discussions with a clear decision.
 - Start with DISCUSS or PLAN when scope, risk, or workload is unclear.
@@ -204,6 +212,7 @@ For DISCUSS, PLAN, REVIEW, and DO:
 - Do not expand scope.
 - Return BLOCKER if unclear.
 - If implementation is not explicitly allowed, inspect only and return PLAN.
+- For REVIEW, say plainly whether the lead should proceed, fix something first, ask a follow-up, or avoid full tests for now.
 - If implementation is allowed, run relevant tests.
 - Do not commit unless explicitly allowed.
 

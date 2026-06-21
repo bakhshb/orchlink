@@ -32,6 +32,7 @@ def test_cli_imports_from_installable_package_and_exposes_required_commands():
     assert "say" in result.output
     assert "close" in result.output
     assert "jobs" in result.output
+    assert "idle" in result.output
     assert "monitor" in result.output
     assert "status" in result.output
     assert "doctor" in result.output

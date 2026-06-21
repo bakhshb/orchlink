@@ -64,6 +64,7 @@ Both sessions listen through the broker. Worker task results and Talk Mode repli
 | `orch say C001 -m "..."` | Send the next turn in an open Talk Mode conversation. |
 | `orch close C001 -m "..."` | Close a conversation with a final decision. |
 | `orch jobs` | List recent tasks and conversations. |
+| `orch idle` | Check that no worker task/talk is pending before dependent tests or final summary. |
 | `orch get T002` | Read an async task result if ready. |
 | `orch wait T002` | Block until an async task finishes or times out. |
 | `orch watch` | Observe task and chat events. |
@@ -118,6 +119,8 @@ orch ask work --wait -t T001 -m "Review this plan and tell me whether to proceed
 Use this for decision gates. Use `orch send` for independent work.
 
 Worker REVIEW is a gate by default. If a review can change the next action, use `orch ask --wait`; do not start full tests or release steps until the review result arrives. `orch send` rejects `MODE: REVIEW` unless you pass `--allow-async-review` for an unrelated, non-gating review.
+
+Before long tests or a final conclusion, run `orch idle`. If worker is not idle, wait for the reply first. After review arrives, think critically about it; ask a follow-up or use Talk Mode if the answer raises risk.
 
 ## Skills and project files
 

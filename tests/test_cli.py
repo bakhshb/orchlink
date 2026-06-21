@@ -276,6 +276,46 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     assert "Done." in wait_result.output
 
 
+def test_idle_reports_ready_when_no_pending_jobs(monkeypatch, tmp_path):
+    init_project(tmp_path, project_id="demo")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
+    monkeypatch.setattr(cli_main, "broker_get_sync", lambda config, path: {"jobs": []})
+
+    result = runner.invoke(cli_main.app, ["idle"])
+
+    assert result.exit_code == 0
+    assert "Worker idle" in result.output
+
+
+def test_idle_blocks_when_worker_has_pending_jobs(monkeypatch, tmp_path):
+    init_project(tmp_path, project_id="demo")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
+    monkeypatch.setattr(
+        cli_main,
+        "broker_get_sync",
+        lambda config, path: {
+            "jobs": [
+                {
+                    "kind": "task",
+                    "task_id": "R001",
+                    "mode": "REVIEW",
+                    "status": "DELIVERED",
+                    "preview": "Review before full tests.",
+                }
+            ]
+        },
+    )
+
+    result = runner.invoke(cli_main.app, ["idle"])
+
+    assert result.exit_code == 1
+    assert "Worker is not idle" in result.output
+    assert "R001" in result.output
+    assert "Do not run dependent full tests" in result.output
+
+
 def test_task_command_reports_in_progress(monkeypatch, tmp_path):
     init_project(tmp_path, project_id="demo")
     monkeypatch.chdir(tmp_path)

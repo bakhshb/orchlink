@@ -155,12 +155,19 @@ def next_conversation_id(config: dict[str, Any]) -> str:
     return f"C{highest + 1:03d}"
 
 
+BLOCKING_JOB_STATUSES = {"PENDING", "QUEUED", "DELIVERED", "RUNNING", "IN_PROGRESS", "OPEN"}
+
+
 def conversation_state(config: dict[str, Any], conversation_id: str) -> dict[str, Any] | None:
     body = broker_get_sync(config, "/v1/jobs?limit=500")
     for job in body.get("jobs", []):
         if job.get("conversation_id") == conversation_id:
             return job
     return None
+
+
+def blocking_jobs(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [job for job in jobs if str(job.get("status") or "").upper() in BLOCKING_JOB_STATUSES]
 
 
 def run_update(ref: str, reinstall_only: bool = False) -> None:
@@ -693,6 +700,30 @@ def jobs(limit: Annotated[int, typer.Option("--limit")] = 50) -> None:
             f"{job_id}\t{job.get('kind', '-')}\t{job.get('mode', '-')}\t{job.get('status', '-')}\t"
             f"{job.get('from_agent', '-')} → {job.get('to_agent', '-')}\t{job.get('created_at', '-')}\t{preview}"
         )
+
+
+@app.command()
+def idle(limit: Annotated[int, typer.Option("--limit")] = 50) -> None:
+    config = load_project_or_exit()
+    try:
+        ensure_broker_running(config)
+        body = broker_get_sync(config, f"/v1/jobs?limit={limit}")
+    except (RuntimeError, httpx.HTTPError) as exc:
+        console.print(f"[Orch] {exc}")
+        raise typer.Exit(1) from exc
+
+    pending = blocking_jobs(body.get("jobs", []))
+    if not pending:
+        console.print("[Orch] Worker idle: no pending tasks or open talks.")
+        return
+
+    console.print("[Orch] Worker is not idle. Pending worker work exists:")
+    for job in pending:
+        job_id = job.get("task_id") or job.get("conversation_id") or "-"
+        preview = str(job.get("preview") or job.get("last_message_preview") or "")
+        console.print(f"- {job_id} {job.get('kind', '-')} {job.get('mode', '-')} {job.get('status', '-')}: {preview}")
+    console.print("[Orch] Do not run dependent full tests or final conclusions yet.")
+    raise typer.Exit(1)
 
 
 @app.command("get")

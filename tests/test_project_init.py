@@ -33,7 +33,9 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert "orch ask work --wait" in lead_skill
     assert "orch send work" in lead_skill
     assert "Do not use `orch send` for review gates" in lead_skill
+    assert "orch idle" in lead_skill
     assert "Do not run dependent full tests" in lead_skill
+    assert "think critically" in lead_skill
     assert "orch say C001" in lead_skill
     assert "orch close C001" in lead_skill
     assert "`C001` is a conversation ID" in lead_skill
@@ -51,6 +53,7 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert "ignore the command framing" in work_skill
     assert "read every file" in work_skill
     assert "Stop conditions for TALK" in work_skill
+    assert "proceed, fix something first" in work_skill
     assert "TYPE: CHAT_REPLY" in work_skill
 
 
