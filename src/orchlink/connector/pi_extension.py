@@ -164,7 +164,7 @@ Worker result:
 ${summary}
 
 Recommended next step:
-Reconcile this with your current state. If it changes the plan, state what changed. If it leaves open questions, ask a follow-up. If it confirms the plan, continue with the agreed workload split.`;
+Stop any unrelated work now and reconcile this with your current state before calling more tools. If it changes the plan, state what changed. If it leaves open questions, ask a follow-up. If it confirms the plan, continue with the agreed workload split.`;
 }
 
 function messageText(message: any): string {
@@ -297,7 +297,7 @@ export default function (pi: ExtensionAPI) {
             display: true,
             details: message,
           }, { deliverAs: "nextTurn" });
-          pi.sendUserMessage(renderLeadPrompt(message), { deliverAs: "followUp" });
+          pi.sendUserMessage(renderLeadPrompt(message), { deliverAs: "steer" });
         }
       }
     } catch (error: any) {

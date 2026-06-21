@@ -36,6 +36,7 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert "orch idle" in lead_skill
     assert "Do not run dependent full tests" in lead_skill
     assert "single-flight" in lead_skill
+    assert "steering interrupt" in lead_skill
     assert "think critically" in lead_skill
     assert "orch say C001" in lead_skill
     assert "orch close C001" in lead_skill

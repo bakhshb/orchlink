@@ -52,6 +52,8 @@ orch idle
 
 The worker lane is single-flight. Do not stack two worker tasks. Wait for the current worker reply, or close the current talk, before sending another task.
 
+When a `[Orchlink] Result from ...` message appears in the lead chat, treat it as a steering interrupt. Stop unrelated work, reconcile the worker result, then continue.
+
 ## If the user says "talk with work"
 
 Run a short back-and-forth. Do not turn the first message into a full review request.
