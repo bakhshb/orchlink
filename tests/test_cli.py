@@ -127,6 +127,7 @@ def test_talk_creates_conversation(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert "Started conversation C001" in result.output
     assert "Waiting for worker reply" in result.output
+    assert "not a final answer" in result.output
 
 
 def test_say_sends_chat_turn(monkeypatch, tmp_path):
@@ -151,6 +152,7 @@ def test_say_sends_chat_turn(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert "Sent turn 3/6" in result.output
+    assert "discussion is not resolved" in result.output
 
 
 def test_close_sends_chat_close(monkeypatch, tmp_path):

@@ -59,6 +59,8 @@ Do not put task boilerplate in Talk Mode messages:
 
 After `orch talk` or `orch say`, wait for the worker reply to appear in the lead Pi chat. Do not run sleep loops. Use `orch jobs` only as a quick status check if needed.
 
+A real Talk Mode exchange is usually more than one worker answer. If the user asked you to "talk", "discuss", or "think with work", do not summarize after the first worker reply. Continue with `orch say` for at least one focused follow-up unless the decision is already obvious. Close with `orch close` before giving the user a final summary.
+
 ## Task message checklist
 
 Every `orch ask` or `orch send` task should include:
@@ -101,7 +103,7 @@ Your job is to collaborate with the lead. You may discuss, plan, inspect, implem
 - REVIEW: inspect and report; no edits unless explicitly allowed.
 - DO: implement only inside allowed scope.
 
-For TALK, behave like a collaborator, not a command executor. Disagree when the lead's assumptions are weak, compare options, identify risks, and recommend a practical decision. If the lead accidentally uses task/checklist wording in TALK, ignore the command framing and answer conversationally.
+For TALK, behave like a collaborator, not a command executor. Disagree when the lead's assumptions are weak, compare options, identify risks, and recommend a practical decision. If the lead accidentally uses task/checklist wording in TALK, ignore the command framing and answer conversationally. End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
 
 ## Rules
 

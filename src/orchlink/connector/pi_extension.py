@@ -58,6 +58,7 @@ Rules:
 - Do not run implementation.
 - Do not expand scope.
 - Keep the answer useful and direct.
+- End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
 
 Reply using this format:
 
@@ -146,13 +147,15 @@ Turn: ${message.turn || "?"}/${message.max_turns || "?"}
 Worker says:
 ${summary}
 
-You can continue with:
-orch say ${message.conversation_id || "<conversation_id>"} -m "<your reply>"
+This conversation is still open unless the turn limit has been reached or a decision is obvious. Do not treat one worker reply as a final summary.
 
-Or close with:
+If this was a real discussion request and Turn is less than Max turns, prefer at least one focused follow-up:
+orch say ${message.conversation_id || "<conversation_id>"} -m "<challenge, tradeoff, or follow-up>"
+
+When the discussion has a decision, close it explicitly:
 orch close ${message.conversation_id || "<conversation_id>"} -m "<final decision>"
 
-Do not automatically continue the conversation. Use orch say only when another turn is needed.`;
+Only summarize to the user after you close the conversation or have a clear reason not to continue.`;
   }
 
   return `[Orchlink] Result from ${message.from_agent || "work"}

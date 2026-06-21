@@ -50,6 +50,7 @@ def test_render_worker_prompt_uses_talk_shape():
     assert "not a task assignment" in prompt
     assert "Conversation ID:\nC001" in prompt
     assert "Challenge weak assumptions" in prompt
+    assert "one sharp follow-up question" in prompt
     assert "TYPE: CHAT_REPLY" in prompt
 
 

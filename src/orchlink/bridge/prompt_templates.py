@@ -49,6 +49,7 @@ Rules:
 - Do not run implementation.
 - Do not expand scope.
 - Keep the answer useful and direct.
+- End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
 
 Reply using this format:
 
