@@ -67,6 +67,13 @@ Open the worker session in another terminal:
 orch work
 ```
 
+These commands reopen the saved Pi sessions for the project. Start clean Pi histories when you need them:
+
+```bash
+orch lead --new
+orch work --new
+```
+
 Send a task from the lead session, or from any shell in the same project:
 
 ```bash
