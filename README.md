@@ -82,6 +82,8 @@ Talk Mode is for reasoning only. The worker should compare options, identify ris
 
 `orch talk` starts the conversation; it is not meant to be a one-shot answer. Continue with `orch say` until the decision is clear, then use `orch close` before summarizing.
 
+`C001` is a conversation ID. Use it with `orch say` and `orch close`. `orch get` and `orch wait` are for task IDs like `T010`.
+
 Write Talk Mode messages like a conversation, not a task spec. Avoid `TASK_ID`, scope, permission, and expected-reply boilerplate in `orch talk` / `orch say` messages.
 
 ## Async task example

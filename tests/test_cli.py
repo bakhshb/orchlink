@@ -178,6 +178,39 @@ def test_close_sends_chat_close(monkeypatch, tmp_path):
     assert "Closed conversation C001" in result.output
 
 
+def test_get_conversation_id_prints_conversation_guidance(monkeypatch, tmp_path):
+    init_project(tmp_path, project_id="demo")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
+
+    def fake_broker_get_sync(config, path):
+        if path == "/v1/tasks/C001":
+            return {"status": "missing", "task_id": "C001", "error": "Task not found."}
+        if path.startswith("/v1/jobs"):
+            return {
+                "jobs": [
+                    {
+                        "kind": "conversation",
+                        "conversation_id": "C001",
+                        "mode": "TALK",
+                        "status": "OPEN",
+                        "turn": 3,
+                        "max_turns": 6,
+                        "preview": "Discuss repo risks.",
+                    }
+                ]
+            }
+        raise AssertionError(path)
+
+    monkeypatch.setattr(cli_main, "broker_get_sync", fake_broker_get_sync)
+
+    result = runner.invoke(cli_main.app, ["get", "C001"])
+
+    assert result.exit_code == 0
+    assert "Conversation C001: OPEN" in result.output
+    assert "Continue: orch say C001" in result.output
+
+
 def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     init_project(tmp_path, project_id="demo")
     monkeypatch.chdir(tmp_path)
@@ -197,6 +230,9 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     wait_result = runner.invoke(cli_main.app, ["wait", "T010", "--timeout-seconds", "1"])
 
     assert jobs_result.exit_code == 0
+    assert "ID" in jobs_result.output
+    assert "KIND" in jobs_result.output
+    assert "MODE" in jobs_result.output
     assert "T010" in jobs_result.output
     assert get_result.exit_code == 0
     assert "Done." in get_result.output

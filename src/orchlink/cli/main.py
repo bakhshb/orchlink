@@ -555,6 +555,18 @@ def _print_task_body(body: dict[str, Any]) -> None:
         console.print(str(body["error"]))
 
 
+def _print_conversation_body(conversation: dict[str, Any]) -> None:
+    conversation_id = str(conversation.get("conversation_id") or "")
+    console.print(f"[Orch] Conversation {conversation_id}: {conversation.get('status', 'UNKNOWN')}")
+    console.print(f"[Orch] Turn: {conversation.get('turn', '?')}/{conversation.get('max_turns', '?')}")
+    preview = str(conversation.get("last_message_preview") or conversation.get("preview") or "").strip()
+    if preview:
+        console.print(preview)
+    if conversation.get("status") == "OPEN":
+        console.print(f"[Orch] Continue: orch say {conversation_id} -m \"...\"")
+        console.print(f"[Orch] Close: orch close {conversation_id} -m \"Decision: ...\"")
+
+
 @app.command()
 def talk(
     worker_id: str,
@@ -664,21 +676,27 @@ def jobs(limit: Annotated[int, typer.Option("--limit")] = 50) -> None:
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
+    console.print("ID\tKIND\tMODE\tSTATUS\tROUTE\tCREATED\tPREVIEW")
     for job in body.get("jobs", []):
         job_id = job.get("task_id") or job.get("conversation_id") or "-"
         preview = str(job.get("preview") or job.get("last_message_preview") or "")
         console.print(
-            f"{job_id}\t{job.get('mode', '-')}\t{job.get('status', '-')}\t"
+            f"{job_id}\t{job.get('kind', '-')}\t{job.get('mode', '-')}\t{job.get('status', '-')}\t"
             f"{job.get('from_agent', '-')} → {job.get('to_agent', '-')}\t{job.get('created_at', '-')}\t{preview}"
         )
 
 
 @app.command("get")
-def get_command(task_id: str) -> None:
+def get_command(item_id: str) -> None:
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_get_sync(config, f"/v1/tasks/{task_id}")
+        body = broker_get_sync(config, f"/v1/tasks/{item_id}")
+        if body.get("status") == "missing":
+            conversation = conversation_state(config, item_id)
+            if conversation is not None:
+                _print_conversation_body(conversation)
+                return
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc

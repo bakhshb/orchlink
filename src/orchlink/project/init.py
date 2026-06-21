@@ -26,28 +26,31 @@ Use `orch send` when the worker can work while you continue on a different scope
 
 orch send work -t T002 -m "MODE: PLAN. Inspect tests. Do not edit files."
 
-Use `orch say` for the next turn in an open Talk Mode conversation:
+Use `orch say` for the next turn in an open Talk Mode conversation. Replace `C001` with the conversation ID printed by `orch talk`:
 
 orch say C001 -m "You said memory-only is fine. What restart or lost-state risk am I underrating?"
 
-Use `orch close` when the discussion has a decision:
+Use `orch close` when the discussion has a decision. Use the same conversation ID:
 
 orch close C001 -m "Decision: memory only for MVP, SQLite later behind MessageStore."
 
-Track async work only when needed:
+Track async tasks only when needed:
 
 orch jobs
 orch get T002
 orch wait T002
 
+`T002` is a task ID. `C001` is a conversation ID. Do not use `orch get C001` to read a Talk Mode reply; read the reply in the lead Pi chat, then use `orch say C001` or `orch close C001`.
+
 ## If the user says "talk with work"
 
 1. Start with `orch talk work -m "<plain conversational message>" -r 6`.
-2. Wait for the worker reply in the lead Pi chat.
-3. Do not summarize after the first worker reply.
-4. Send at least one focused follow-up with `orch say C001 -m "..."` unless the answer already settles the decision.
-5. Close with `orch close C001 -m "Decision: ..."`.
-6. Summarize for the user after the close.
+2. Save the conversation ID printed by the command, such as `C001`.
+3. Wait for the worker reply in the lead Pi chat.
+4. Do not summarize after the first worker reply.
+5. Send at least one focused follow-up with `orch say <conversation_id> -m "..."` unless the answer already settles the decision.
+6. Close with `orch close <conversation_id> -m "Decision: ..."`.
+7. Summarize for the user after the close.
 
 Do not run sleep loops. Do not use `orch jobs` as a substitute for reading the worker reply.
 
