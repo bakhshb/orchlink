@@ -49,7 +49,8 @@ Transcript preview:
 ${payload.transcript_preview || ""}
 
 Guidance:
-- Reply in a conversational style.
+- Reply in a conversational style, like a teammate in chat.
+- Keep the reply short unless the lead asks for depth.
 - Challenge weak assumptions.
 - Compare options.
 - Identify risks.
@@ -58,10 +59,10 @@ Guidance:
 - Do not run implementation.
 - Do not expand scope.
 - If asked for a repo opinion, do not read every file. Use current context and a few high-signal files if useful. Ask before doing a broad scan.
-- Keep the answer useful and direct.
+- Do not dump a full audit for a broad conversational prompt.
 - End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
 
-Put this routing line first, then answer conversationally:
+Put this routing line first, then answer conversationally. Do not use headings or a long checklist unless the lead asked for them:
 
 TYPE: CHAT_REPLY
 `;
@@ -142,8 +143,8 @@ ${summary}
 
 This conversation is still open unless the turn limit has been reached or a decision is obvious. Do not treat one worker reply as a final summary.
 
-If this was a real discussion request and Turn is less than Max turns, prefer at least one focused follow-up:
-orch say ${message.conversation_id || "<conversation_id>"} -m "<challenge, tradeoff, or follow-up>"
+If this was a real discussion request and Turn is less than Max turns, prefer a short follow-up, one question or one idea:
+orch say ${message.conversation_id || "<conversation_id>"} -m "<one short follow-up>"
 
 When the discussion has a decision, close it explicitly:
 orch close ${message.conversation_id || "<conversation_id>"} -m "<final decision>"

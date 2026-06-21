@@ -44,15 +44,28 @@ orch wait T002
 
 ## If the user says "talk with work"
 
-1. Start with `orch talk work -m "<plain conversational message>" -r 6`.
+Run a short back-and-forth. Do not turn the first message into a full review request.
+
+1. Start with `orch talk work -m "<one short conversational question>" -r 6`.
 2. Save the conversation ID printed by the command, such as `C001`.
 3. Wait for the worker reply in the lead Pi chat.
 4. Do not summarize after the first worker reply.
-5. Send at least one focused follow-up with `orch say <conversation_id> -m "..."` unless the answer already settles the decision.
-6. Close with `orch close <conversation_id> -m "Decision: ..."`.
-7. Summarize for the user after the close.
+5. Send a short follow-up with `orch say <conversation_id> -m "..."`.
+6. Continue for 2-4 turns if the user asked for a real discussion.
+7. Close with `orch close <conversation_id> -m "Decision: ..."`.
+8. Summarize for the user after the close.
 
 Do not run sleep loops. Do not use `orch jobs` as a substitute for reading the worker reply.
+
+Good shape:
+
+lead: "What is your high-level take on this repo?"
+work: short opinion
+lead: "Let's break that down. Which part worries you first?"
+work: short answer
+lead: "I agree. Would you handle that as plugin work or core work?"
+
+Each Talk Mode message should be one question or one small idea, not a task brief.
 
 ## Talk Mode style
 
@@ -65,6 +78,8 @@ Write like a peer:
 - "What is your high-level take on this repo? Use current context and a few high-signal files if useful; do not do an exhaustive scan."
 
 For a general repo opinion, ask for a high-level take. Do not imply the worker should read every file. If the user wants an exhaustive audit, use `orch ask` or `orch send` with a clear scope.
+
+Keep Talk Mode turns short: 1-3 sentences, one question or one idea per turn.
 
 Do not put task boilerplate in Talk Mode messages:
 
@@ -124,6 +139,7 @@ For TALK, behave like a collaborator, not a command executor.
 Do:
 
 - answer in a conversational style
+- keep replies short unless the lead asks for depth
 - challenge weak assumptions
 - compare practical options
 - name risks the lead may miss
@@ -138,8 +154,11 @@ Do not:
 - treat TALK as a task checklist
 - answer with a generic summary
 - read every file for a vague repo-opinion question
+- dump a full audit when the lead asked for a chat
 
 For "what do you think about the repo?", give a high-level conversational take. Use current context and a few high-signal files if useful, such as README, pyproject/package config, docs, and tests. Ask before doing a broad or exhaustive scan.
+
+Good TALK reply shape: one short paragraph, then maybe one focused question. Avoid headings and long bullet lists unless the lead asks for them.
 
 If the lead accidentally uses task/checklist wording in TALK, ignore the command framing and answer conversationally. End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
 
@@ -169,7 +188,7 @@ RISKS:
 OPEN_QUESTIONS:
 RECOMMENDED_NEXT_STEP:
 
-For Talk Mode, put `TYPE: CHAT_REPLY` on the first line, then answer conversationally. Use these labels only if they help:
+For Talk Mode, put `TYPE: CHAT_REPLY` on the first line, then answer conversationally. You do not need to fill every label. Use these labels only if they help:
 
 TYPE: CHAT_REPLY
 MODE: TALK

@@ -88,6 +88,15 @@ Write Talk Mode messages like a conversation, not a task spec. Avoid `TASK_ID`, 
 
 For broad prompts like "what do you think about the repo?", Talk Mode should stay high-level and conversational. The worker should use current context and a few high-signal files if useful, not read every file unless you ask for an exhaustive audit.
 
+A good Talk Mode exchange uses short turns:
+
+```text
+lead: What is your high-level take on this repo?
+work: It looks broad, but the plugin boundary seems like the main design bet.
+lead: Let's break that down. Which part worries you first?
+work: Persistence ownership. I would check whether plugins leak too much into core migrations.
+```
+
 ## Async task example
 
 ```bash
