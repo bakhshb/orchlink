@@ -80,7 +80,9 @@ orch close C001 -m "Decision: memory only for MVP, SQLite later behind MessageSt
 
 Talk Mode is for reasoning only. The worker should compare options, identify risks, disagree when useful, and recommend a practical decision. It must not edit files.
 
-`orch talk` starts the conversation; it is not meant to be a one-shot answer. Continue with `orch say` until the decision is clear, then use `orch close` before summarizing.
+`orch talk` starts the conversation; it is not meant to be a one-shot answer. Continue with `orch say` until Talk Mode reaches a stop condition, then use `orch close` before summarizing.
+
+Talk Mode stops when it has produced one of: clear decision, next task, blocker, max rounds, timeout, or no new value.
 
 `C001` is a conversation ID. Use it with `orch say` and `orch close`. `orch get` and `orch wait` are for task IDs like `T010`.
 

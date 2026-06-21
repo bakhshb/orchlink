@@ -51,7 +51,9 @@ Guidance:
 - Do not expand scope.
 - If asked for a repo opinion, do not read every file. Use current context and a few high-signal files if useful. Ask before doing a broad scan.
 - Do not dump a full audit for a broad conversational prompt.
-- End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
+- Talk Mode stops when it has produced one of: clear decision, next task, blocker, max rounds, timeout, or no new value.
+- If a stop condition is reached, say it plainly in conversational text.
+- Otherwise end with one sharp follow-up question that would move the conversation forward.
 
 Put this routing line first, then answer conversationally. Do not use headings or a long checklist unless the lead asked for them:
 

@@ -38,6 +38,8 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert "Do not use `orch get C001`" in lead_skill
     assert "Talk Mode is a conversation" in lead_skill
     assert "Do not summarize after the first worker reply" in lead_skill
+    assert "Stop conditions" in lead_skill
+    assert "no new value" in lead_skill
     assert "do not do an exhaustive scan" in lead_skill
     assert "no TASK_ID" in lead_skill
     assert "MODE: DISCUSS | PLAN | DO | REVIEW" in lead_skill
@@ -46,6 +48,7 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert "For TALK, behave like a collaborator" in work_skill
     assert "ignore the command framing" in work_skill
     assert "read every file" in work_skill
+    assert "Stop conditions for TALK" in work_skill
     assert "TYPE: CHAT_REPLY" in work_skill
 
 

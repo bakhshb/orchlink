@@ -52,8 +52,18 @@ Run a short back-and-forth. Do not turn the first message into a full review req
 4. Do not summarize after the first worker reply.
 5. Send a short follow-up with `orch say <conversation_id> -m "..."`.
 6. Continue for 2-4 turns if the user asked for a real discussion.
-7. Close with `orch close <conversation_id> -m "Decision: ..."`.
-8. Summarize for the user after the close.
+7. Stop when the conversation has produced one stop condition.
+8. Close with `orch close <conversation_id> -m "Decision: ..."`.
+9. Summarize for the user after the close.
+
+Stop conditions:
+
+- clear decision
+- next task
+- blocker
+- max rounds
+- timeout
+- no new value
 
 Do not run sleep loops. Do not use `orch jobs` as a substitute for reading the worker reply.
 
@@ -80,6 +90,8 @@ Write like a peer:
 For a general repo opinion, ask for a high-level take. Do not imply the worker should read every file. If the user wants an exhaustive audit, use `orch ask` or `orch send` with a clear scope.
 
 Keep Talk Mode turns short: 1-3 sentences, one question or one idea per turn.
+
+Close Talk Mode when you hit a stop condition: clear decision, next task, blocker, max rounds, timeout, or no new value.
 
 Do not put task boilerplate in Talk Mode messages:
 
@@ -159,6 +171,8 @@ Do not:
 For "what do you think about the repo?", give a high-level conversational take. Use current context and a few high-signal files if useful, such as README, pyproject/package config, docs, and tests. Ask before doing a broad or exhaustive scan.
 
 Good TALK reply shape: one short paragraph, then maybe one focused question. Avoid headings and long bullet lists unless the lead asks for them.
+
+Stop conditions for TALK are: clear decision, next task, blocker, max rounds, timeout, or no new value. If your reply reaches one, say it plainly, for example: "I think we can stop here: we have a clear decision."
 
 If the lead accidentally uses task/checklist wording in TALK, ignore the command framing and answer conversationally. End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
 

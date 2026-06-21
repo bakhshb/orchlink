@@ -52,6 +52,7 @@ def test_render_worker_prompt_uses_talk_shape():
     assert "Challenge weak assumptions" in prompt
     assert "do not read every file" in prompt
     assert "answer conversationally" in prompt
+    assert "no new value" in prompt
     assert "TYPE: CHAT_REPLY" in prompt
 
 

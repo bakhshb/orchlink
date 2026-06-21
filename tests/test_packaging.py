@@ -45,7 +45,8 @@ def test_pi_extension_uses_valid_record_type():
     assert "type OrchMessage = Record;" not in ORCHLINK_PI_EXTENSION
     assert "TYPE: CHAT_REPLY" in ORCHLINK_PI_EXTENSION
     assert "do not read every file" in ORCHLINK_PI_EXTENSION
-    assert "Do not treat one worker reply as a final summary" in ORCHLINK_PI_EXTENSION
+    assert "no new value" in ORCHLINK_PI_EXTENSION
+    assert "Talk Mode should stop only when" in ORCHLINK_PI_EXTENSION
 
 
 def test_broker_run_command_is_registered_without_starting_server(monkeypatch):

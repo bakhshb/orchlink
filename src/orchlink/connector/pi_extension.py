@@ -60,7 +60,9 @@ Guidance:
 - Do not expand scope.
 - If asked for a repo opinion, do not read every file. Use current context and a few high-signal files if useful. Ask before doing a broad scan.
 - Do not dump a full audit for a broad conversational prompt.
-- End with either a concrete decision recommendation or one sharp follow-up question that would move the conversation forward.
+- Talk Mode stops when it has produced one of: clear decision, next task, blocker, max rounds, timeout, or no new value.
+- If a stop condition is reached, say it plainly in conversational text.
+- Otherwise end with one sharp follow-up question that would move the conversation forward.
 
 Put this routing line first, then answer conversationally. Do not use headings or a long checklist unless the lead asked for them:
 
@@ -141,13 +143,13 @@ Turn: ${message.turn || "?"}/${message.max_turns || "?"}
 Worker says:
 ${summary}
 
-This conversation is still open unless the turn limit has been reached or a decision is obvious. Do not treat one worker reply as a final summary.
+Talk Mode should stop only when it has produced one of these: clear decision, next task, blocker, max rounds, timeout, or no new value.
 
-If this was a real discussion request and Turn is less than Max turns, prefer a short follow-up, one question or one idea:
+If a stop condition has not been reached and Turn is less than Max turns, send a short follow-up, one question or one idea:
 orch say ${message.conversation_id || "<conversation_id>"} -m "<one short follow-up>"
 
-When the discussion has a decision, close it explicitly:
-orch close ${message.conversation_id || "<conversation_id>"} -m "<final decision>"
+If a stop condition has been reached, close it explicitly:
+orch close ${message.conversation_id || "<conversation_id>"} -m "<decision, next task, blocker, or stop reason>"
 
 Only summarize to the user after you close the conversation or have a clear reason not to continue.`;
   }
