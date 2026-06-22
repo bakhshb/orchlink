@@ -140,6 +140,39 @@ def test_chat_start_creates_conversation_job():
     assert jobs[0]["status"] == "OPEN"
 
 
+def test_jobs_and_tasks_filter_by_project_id():
+    client = make_client()
+    first = {
+        "protocol": "orch-a2a-v1",
+        "message_id": "msg-p1",
+        "correlation_id": "req-p1",
+        "project_id": "p1",
+        "conversation_id": "p1-tasks",
+        "task_id": "T001",
+        "from_agent": "p1.lead",
+        "to_agent": "p1.work",
+        "type": "TASK",
+        "status": "PENDING",
+        "turn": 1,
+        "max_turns": 6,
+        "requires_reply": True,
+        "timeout_seconds": 1800,
+        "delivery": "async",
+        "payload": {"mode": "PLAN", "intent": "P1 task."},
+    }
+    second = {**first, "message_id": "msg-p2", "correlation_id": "req-p2", "project_id": "p2", "conversation_id": "p2-tasks", "from_agent": "p2.lead", "to_agent": "p2.work", "payload": {"mode": "PLAN", "intent": "P2 task."}}
+
+    client.post("/v1/messages/send", headers=auth_headers(), json=first)
+    client.post("/v1/messages/send", headers=auth_headers(), json=second)
+    jobs_response = client.get("/v1/jobs?project_id=p1", headers=auth_headers())
+    task_response = client.get("/v1/tasks/T001?project_id=p2", headers=auth_headers())
+
+    jobs = jobs_response.json()["jobs"]
+    assert len(jobs) == 1
+    assert jobs[0]["project_id"] == "p1"
+    assert task_response.json()["job"]["from_agent"] == "p2.lead"
+
+
 def test_get_and_wait_task_result():
     client = make_client()
     message = {
@@ -180,6 +213,15 @@ def test_get_and_wait_task_result():
     assert get_response.json()["status"] == "DONE"
     assert get_response.json()["reply"]["payload"]["summary"] == "Done."
     assert wait_response.json()["status"] == "DONE"
+
+
+def test_status_update_rejects_terminal_status():
+    client = make_client()
+
+    response = client.post("/v1/messages/missing/status", headers=auth_headers(), json={"status": "DONE"})
+
+    assert response.status_code == 400
+    assert "RUNNING" in response.json()["detail"]
 
 
 def test_update_message_status_marks_message_running():

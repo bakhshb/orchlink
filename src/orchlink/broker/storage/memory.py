@@ -39,6 +39,18 @@ class MemoryMessageStore(MessageStore):
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed
 
+    def _project_id(self, message: dict[str, Any]) -> str:
+        return str(message.get("project_id") or "default")
+
+    def _task_key(self, project_id: str | None, task_id: str) -> str:
+        return f"{project_id or 'default'}:{task_id}"
+
+    def _conversation_key(self, project_id: str | None, conversation_id: str) -> str:
+        return f"{project_id or 'default'}:{conversation_id}"
+
+    def _same_project(self, item: dict[str, Any], project_id: str | None) -> bool:
+        return project_id is None or str(item.get("project_id") or "default") == str(project_id)
+
     def _payload_preview(self, payload: dict[str, Any]) -> str:
         for key in ("message", "intent", "topic", "summary", "stdout"):
             value = payload.get(key)
@@ -94,8 +106,10 @@ class MemoryMessageStore(MessageStore):
                     "error": "Task exceeded its timeout_seconds before the worker replied.",
                     "job": dict(message),
                 }
-                self._results_by_task[str(task_id)] = result
+                task_key = self._task_key(self._project_id(message), str(task_id))
+                self._results_by_task[task_key] = result
                 self._upsert_task_locked(message, "TIMEOUT")
+                self._resolve_task_waiters_locked(task_key, result)
                 self._resolve_task_waiters_locked(str(task_id), result)
             if str(message.get("type") or "").startswith("CHAT_"):
                 self._touch_conversation_locked(message, status="TIMEOUT")
@@ -144,11 +158,14 @@ class MemoryMessageStore(MessageStore):
         task_id = message.get("task_id")
         if not task_id:
             return
+        project_id = self._project_id(message)
+        task_key = self._task_key(project_id, str(task_id))
         now = self._now()
-        existing = self._tasks.get(str(task_id), {})
+        existing = self._tasks.get(task_key, {})
         is_reply = bool(existing) and message.get("type") != "TASK"
-        self._tasks[str(task_id)] = {
+        self._tasks[task_key] = {
             "kind": "task",
+            "project_id": project_id,
             "task_id": str(task_id),
             "conversation_id": message.get("conversation_id") or existing.get("conversation_id"),
             "mode": existing.get("mode") if is_reply else self._job_mode(message),
@@ -171,8 +188,10 @@ class MemoryMessageStore(MessageStore):
         message_type = str(message.get("type") or "")
         if not message_type.startswith("CHAT_"):
             return
+        project_id = self._project_id(message)
+        conversation_key = self._conversation_key(project_id, str(conversation_id))
         now = self._now()
-        existing = self._conversations.get(str(conversation_id), {})
+        existing = self._conversations.get(conversation_key, {})
         next_status = status or existing.get("status") or "OPEN"
         if message_type == "CHAT_CLOSE":
             next_status = "CLOSED"
@@ -186,10 +205,10 @@ class MemoryMessageStore(MessageStore):
         for agent in (message.get("from_agent"), message.get("to_agent")):
             if agent and agent not in participants:
                 participants.append(agent)
-        self._conversations[str(conversation_id)] = {
+        self._conversations[conversation_key] = {
             "kind": "conversation",
             "conversation_id": str(conversation_id),
-            "project_id": message.get("project_id") or existing.get("project_id"),
+            "project_id": project_id,
             "participants": participants,
             "mode": "TALK",
             "status": next_status,
@@ -208,8 +227,9 @@ class MemoryMessageStore(MessageStore):
         message_type = str(message.get("type") or "")
         if message_type not in {"CHAT_TURN", "CHAT_REPLY"}:
             return
+        project_id = self._project_id(message)
         conversation_id = str(message.get("conversation_id") or "")
-        conversation = self._conversations.get(conversation_id)
+        conversation = self._conversations.get(self._conversation_key(project_id, conversation_id))
         if not conversation:
             raise ValueError(f"Conversation not found: {conversation_id}")
         if conversation.get("status") != "OPEN":
@@ -239,7 +259,10 @@ class MemoryMessageStore(MessageStore):
             return
 
         to_agent = message.get("to_agent")
+        project_id = self._project_id(message)
         for active in self._active_messages.values():
+            if not self._same_project(active, project_id):
+                continue
             if active.get("to_agent") != to_agent:
                 continue
             if str(active.get("status") or "").upper() not in BUSY_MESSAGE_STATUSES:
@@ -250,6 +273,8 @@ class MemoryMessageStore(MessageStore):
         if message_type in {"CHAT_TURN", "CHAT_CLOSE"}:
             return
         for conversation in self._conversations.values():
+            if not self._same_project(conversation, project_id):
+                continue
             if conversation.get("status") != "OPEN":
                 continue
             if to_agent not in conversation.get("participants", []):
@@ -258,8 +283,8 @@ class MemoryMessageStore(MessageStore):
                 continue
             raise MessageStoreBusy(self._busy_detail(conversation, message))
 
-    def _resolve_task_waiters_locked(self, task_id: str, result: dict[str, Any]) -> None:
-        waiters = self._task_waiters.pop(task_id, [])
+    def _resolve_task_waiters_locked(self, task_key: str, result: dict[str, Any]) -> None:
+        waiters = self._task_waiters.pop(task_key, [])
         for future in waiters:
             if not future.done():
                 future.set_result(result)
@@ -384,8 +409,10 @@ class MemoryMessageStore(MessageStore):
                 self._active_messages[message_id]["updated_at"] = self._now()
             if task_id:
                 result = {"status": job_status, "task_id": str(task_id), "reply": stored_reply}
-                self._results_by_task[str(task_id)] = result
+                task_key = self._task_key(self._project_id(stored_reply), str(task_id))
+                self._results_by_task[task_key] = result
                 self._upsert_task_locked(stored_reply, job_status)
+                self._resolve_task_waiters_locked(task_key, result)
                 self._resolve_task_waiters_locked(str(task_id), result)
             if str(stored_reply.get("type") or "").startswith("CHAT_"):
                 self._touch_conversation_locked(stored_reply, status="OPEN" if job_status == "DONE" else job_status)
@@ -423,20 +450,28 @@ class MemoryMessageStore(MessageStore):
             )
             return {"status": normalized_status, "message_id": message_id}
 
-    async def cancel_work(self, item_id: str, reason: str = "") -> dict[str, Any]:
+    async def cancel_work(self, item_id: str, reason: str = "", project_id: str | None = None) -> dict[str, Any]:
         cancelled: list[str] = []
         async with self._lock:
             self._expire_timed_out_messages_locked()
             targets = [
                 message
                 for message in self._active_messages.values()
-                if str(message.get("message_id") or "") == item_id
-                or str(message.get("task_id") or "") == item_id
-                or str(message.get("conversation_id") or "") == item_id
+                if self._same_project(message, project_id)
+                and (
+                    str(message.get("message_id") or "") == item_id
+                    or str(message.get("task_id") or "") == item_id
+                    or str(message.get("conversation_id") or "") == item_id
+                )
             ]
             targets = [message for message in targets if str(message.get("status") or "").upper() not in TERMINAL_MESSAGE_STATUSES]
             if not targets:
-                conversation = self._conversations.get(item_id)
+                conversation = None
+                if project_id is not None:
+                    conversation = self._conversations.get(self._conversation_key(project_id, item_id))
+                else:
+                    matches = [item for item in self._conversations.values() if item.get("conversation_id") == item_id]
+                    conversation = matches[0] if len(matches) == 1 else None
                 if conversation and conversation.get("status") == "OPEN":
                     conversation["status"] = "CANCELLED"
                     conversation["updated_at"] = self._now()
@@ -465,8 +500,10 @@ class MemoryMessageStore(MessageStore):
                         "error": reason or "Work was cancelled.",
                         "job": dict(message),
                     }
-                    self._results_by_task[str(task_id)] = result
+                    task_key = self._task_key(self._project_id(message), str(task_id))
+                    self._results_by_task[task_key] = result
                     self._upsert_task_locked(message, "CANCELLED")
+                    self._resolve_task_waiters_locked(task_key, result)
                     self._resolve_task_waiters_locked(str(task_id), result)
                 if str(message.get("type") or "").startswith("CHAT_"):
                     self._touch_conversation_locked(message, status="CANCELLED")
@@ -488,7 +525,11 @@ class MemoryMessageStore(MessageStore):
     async def close_conversation(self, conversation_id: str, message: dict[str, Any]) -> dict[str, Any]:
         async with self._lock:
             self._expire_timed_out_messages_locked()
-            conversation = self._conversations.get(conversation_id)
+            project_id = self._project_id(message) if message else None
+            conversation = self._conversations.get(self._conversation_key(project_id, conversation_id)) if project_id else None
+            if conversation is None and project_id is None:
+                matches = [item for item in self._conversations.values() if item.get("conversation_id") == conversation_id]
+                conversation = matches[0] if len(matches) == 1 else None
             if conversation is None:
                 raise ValueError(f"Conversation not found: {conversation_id}")
             conversation["status"] = "CLOSED"
@@ -549,38 +590,52 @@ class MemoryMessageStore(MessageStore):
                     if self._pending_replies.get(correlation_id) is future:
                         self._pending_replies.pop(correlation_id, None)
 
-    async def wait_for_task(self, task_id: str, timeout_seconds: int) -> dict[str, Any]:
+    async def wait_for_task(self, task_id: str, timeout_seconds: int, project_id: str | None = None) -> dict[str, Any]:
+        task_key = self._task_key(project_id, task_id) if project_id is not None else task_id
         async with self._lock:
             self._expire_timed_out_messages_locked()
-            if task_id in self._results_by_task:
-                return dict(self._results_by_task[task_id])
+            if project_id is not None and task_key in self._results_by_task:
+                return dict(self._results_by_task[task_key])
+            if project_id is None:
+                matches = [dict(result) for key, result in self._results_by_task.items() if key.endswith(f":{task_id}") or key == task_id]
+                if len(matches) == 1:
+                    return matches[0]
             future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
-            self._task_waiters.setdefault(task_id, []).append(future)
+            self._task_waiters.setdefault(task_key, []).append(future)
 
         try:
             return await asyncio.wait_for(future, timeout=timeout_seconds)
         except asyncio.TimeoutError:
             async with self._lock:
-                waiters = self._task_waiters.get(task_id, [])
-                self._task_waiters[task_id] = [item for item in waiters if item is not future]
-                if not self._task_waiters[task_id]:
-                    self._task_waiters.pop(task_id, None)
+                waiters = self._task_waiters.get(task_key, [])
+                self._task_waiters[task_key] = [item for item in waiters if item is not future]
+                if not self._task_waiters[task_key]:
+                    self._task_waiters.pop(task_key, None)
             return {"status": "WAIT_TIMEOUT", "task_id": task_id, "error": "No task result arrived before the wait timeout."}
 
-    async def get_task_result(self, task_id: str) -> dict[str, Any]:
+    async def get_task_result(self, task_id: str, project_id: str | None = None) -> dict[str, Any]:
+        task_key = self._task_key(project_id, task_id) if project_id is not None else task_id
         async with self._lock:
             self._expire_timed_out_messages_locked()
-            if task_id in self._results_by_task:
-                return dict(self._results_by_task[task_id])
-            if task_id in self._tasks:
-                return {"status": self._tasks[task_id].get("status", "QUEUED"), "task_id": task_id, "job": dict(self._tasks[task_id])}
+            if project_id is not None:
+                if task_key in self._results_by_task:
+                    return dict(self._results_by_task[task_key])
+                if task_key in self._tasks:
+                    return {"status": self._tasks[task_key].get("status", "QUEUED"), "task_id": task_id, "job": dict(self._tasks[task_key])}
+            else:
+                result_matches = [dict(result) for key, result in self._results_by_task.items() if key.endswith(f":{task_id}") or key == task_id]
+                if len(result_matches) == 1:
+                    return result_matches[0]
+                task_matches = [dict(task) for key, task in self._tasks.items() if key.endswith(f":{task_id}") or key == task_id]
+                if len(task_matches) == 1:
+                    return {"status": task_matches[0].get("status", "QUEUED"), "task_id": task_id, "job": task_matches[0]}
             return {"status": "missing", "task_id": task_id, "error": "Task not found."}
 
-    async def list_jobs(self, limit: int = 50) -> list[dict[str, Any]]:
+    async def list_jobs(self, limit: int = 50, project_id: str | None = None) -> list[dict[str, Any]]:
         async with self._lock:
             self._expire_timed_out_messages_locked()
-            jobs = [dict(task) for task in self._tasks.values()]
-            jobs.extend(dict(conversation) for conversation in self._conversations.values())
+            jobs = [dict(task) for task in self._tasks.values() if self._same_project(task, project_id)]
+            jobs.extend(dict(conversation) for conversation in self._conversations.values() if self._same_project(conversation, project_id))
             jobs.sort(key=lambda item: str(item.get("updated_at") or item.get("created_at") or ""), reverse=True)
             return jobs[:limit]
 
@@ -588,19 +643,23 @@ class MemoryMessageStore(MessageStore):
         async with self._lock:
             return [dict(agent) for agent in self._agents.values()]
 
-    async def list_active_messages(self) -> list[dict[str, Any]]:
+    async def list_active_messages(self, project_id: str | None = None) -> list[dict[str, Any]]:
         async with self._lock:
             self._expire_timed_out_messages_locked()
-            return [dict(message) for message in self._active_messages.values()]
+            return [dict(message) for message in self._active_messages.values() if self._same_project(message, project_id)]
 
-    async def list_conversations(self) -> list[dict[str, Any]]:
+    async def list_conversations(self, project_id: str | None = None) -> list[dict[str, Any]]:
         async with self._lock:
             self._expire_timed_out_messages_locked()
-            return [dict(conversation) for conversation in self._conversations.values()]
+            return [dict(conversation) for conversation in self._conversations.values() if self._same_project(conversation, project_id)]
 
-    async def list_events(self, since: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+    async def list_events(self, since: int = 0, limit: int = 100, project_id: str | None = None) -> list[dict[str, Any]]:
         async with self._lock:
-            selected = [dict(event) for event in self._events if int(event["id"]) > since]
+            selected = [
+                dict(event)
+                for event in self._events
+                if int(event["id"]) > since and self._same_project(event, project_id)
+            ]
             return selected[-limit:]
 
     async def pending_reply_count(self) -> int:

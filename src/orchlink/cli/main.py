@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import quote
 from typing import Annotated, Any
 
 import httpx
@@ -147,12 +148,12 @@ def register_project_role_sync(config: dict[str, Any], role: str) -> dict[str, A
     return asyncio.run(register_project_role(config, role))
 
 
-def fetch_status_sync(url: str, api_key: str) -> dict[str, Any]:
-    return asyncio.run(fetch_status(url, api_key))
+def fetch_status_sync(url: str, api_key: str, project_id: str | None = None) -> dict[str, Any]:
+    return asyncio.run(fetch_status(url, api_key, project_id=project_id))
 
 
-def fetch_events_sync(url: str, api_key: str, since: int = 0, limit: int = 50) -> dict[str, Any]:
-    return asyncio.run(fetch_events(url, api_key, since=since, limit=limit))
+def fetch_events_sync(url: str, api_key: str, since: int = 0, limit: int = 50, project_id: str | None = None) -> dict[str, Any]:
+    return asyncio.run(fetch_events(url, api_key, since=since, limit=limit, project_id=project_id))
 
 
 def broker_get_sync(config: dict[str, Any], path: str) -> dict[str, Any]:
@@ -169,9 +170,18 @@ def broker_post_sync(config: dict[str, Any], path: str, body: dict[str, Any] | N
         return response.json()
 
 
+def current_project_id(config: dict[str, Any]) -> str:
+    return str(config.get("project_id") or "default")
+
+
+def project_query(config: dict[str, Any], prefix: str = "?") -> str:
+    project_id = quote(current_project_id(config), safe="")
+    return f"{prefix}project_id={project_id}"
+
+
 def next_conversation_id(config: dict[str, Any]) -> str:
     try:
-        body = broker_get_sync(config, "/v1/jobs?limit=500")
+        body = broker_get_sync(config, f"/v1/jobs?limit=500{project_query(config, '&')}")
     except httpx.HTTPError:
         return "C001"
     highest = 0
@@ -186,7 +196,7 @@ BLOCKING_JOB_STATUSES = {"PENDING", "QUEUED", "DELIVERED", "RUNNING", "IN_PROGRE
 
 
 def conversation_state(config: dict[str, Any], conversation_id: str) -> dict[str, Any] | None:
-    body = broker_get_sync(config, "/v1/jobs?limit=500")
+    body = broker_get_sync(config, f"/v1/jobs?limit=500{project_query(config, '&')}")
     for job in body.get("jobs", []):
         if job.get("conversation_id") == conversation_id:
             return job
@@ -540,8 +550,8 @@ def task(task_id: str) -> None:
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        status_body = fetch_status_sync(broker_url(config), broker_api_key(config))
-        events_body = fetch_events_sync(broker_url(config), broker_api_key(config), limit=500)
+        status_body = fetch_status_sync(broker_url(config), broker_api_key(config), project_id=current_project_id(config))
+        events_body = fetch_events_sync(broker_url(config), broker_api_key(config), limit=500, project_id=current_project_id(config))
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
@@ -626,7 +636,7 @@ def _print_conversation_body(conversation: dict[str, Any]) -> None:
 def talk(
     worker_id: str,
     message: Annotated[str, typer.Option("--msg", "--message", "-m")],
-    rounds: Annotated[int, typer.Option("--rounds", "-r", min=1, max=12)] = 6,
+    rounds: Annotated[int, typer.Option("--rounds", "-r", min=1, max=6, help="Number of lead↔worker back-and-forth rounds.")] = 6,
     timeout_seconds: Annotated[int, typer.Option("--timeout-seconds")] = 1800,
 ) -> None:
     require_nonempty_talk_message(message, "Talk")
@@ -634,12 +644,13 @@ def talk(
     try:
         ensure_broker_running(config)
         conversation_id = next_conversation_id(config)
+        max_turns = rounds * 2
         start_talk_sync(
             config=config,
             worker=worker_id,
             conversation_id=conversation_id,
             message=message,
-            max_turns=rounds,
+            max_turns=max_turns,
             timeout_seconds=timeout_seconds,
             wait=False,
         )
@@ -647,7 +658,7 @@ def talk(
         print_orch_exception(exc)
         raise typer.Exit(1) from exc
     console.print(f"[Orch] Started conversation {conversation_id} with {worker_id}.")
-    console.print(f"[Orch] Max turns: {rounds}")
+    console.print(f"[Orch] Max rounds: {rounds} ({max_turns} turns)")
     console.print("[Orch] Waiting for worker reply in the lead Pi chat.")
     console.print("[Orch] This is turn 1, not a final answer. Continue with: orch say " + conversation_id + " -m \"...\"")
     console.print("[Orch] Close only when the discussion reaches a decision: orch close " + conversation_id + " -m \"...\"")
@@ -729,7 +740,7 @@ def jobs(limit: Annotated[int, typer.Option("--limit")] = 50) -> None:
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_get_sync(config, f"/v1/jobs?limit={limit}")
+        body = broker_get_sync(config, f"/v1/jobs?limit={limit}{project_query(config, '&')}")
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
@@ -748,7 +759,7 @@ def idle(limit: Annotated[int, typer.Option("--limit")] = 50) -> None:
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_get_sync(config, f"/v1/jobs?limit={limit}")
+        body = broker_get_sync(config, f"/v1/jobs?limit={limit}{project_query(config, '&')}")
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
@@ -772,7 +783,7 @@ def get_command(item_id: str) -> None:
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_get_sync(config, f"/v1/tasks/{item_id}")
+        body = broker_get_sync(config, f"/v1/tasks/{item_id}{project_query(config)}")
         if body.get("status") == "missing":
             conversation = conversation_state(config, item_id)
             if conversation is not None:
@@ -792,7 +803,7 @@ def wait_command(
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_get_sync(config, f"/v1/tasks/{task_id}/wait?timeout_seconds={timeout_seconds}")
+        body = broker_get_sync(config, f"/v1/tasks/{task_id}/wait?timeout_seconds={timeout_seconds}{project_query(config, '&')}")
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
@@ -807,7 +818,7 @@ def cancel(
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_post_sync(config, f"/v1/jobs/{item_id}/cancel", {"reason": reason})
+        body = broker_post_sync(config, f"/v1/jobs/{item_id}/cancel", {"reason": reason, "project_id": current_project_id(config)})
     except (RuntimeError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
@@ -855,7 +866,7 @@ def watch(
     last_event_id = 0
     count = 0
     while True:
-        body = fetch_events_sync(broker_url(config), broker_api_key(config), since=last_event_id, limit=limit)
+        body = fetch_events_sync(broker_url(config), broker_api_key(config), since=last_event_id, limit=limit, project_id=current_project_id(config))
         for event in body.get("events", []):
             console.print(format_event(event))
             console.print()

@@ -242,7 +242,7 @@ You normally do not need these. The lead agent uses them when it coordinates wit
 | --- | --- |
 | `orch ask work --wait -t T001 -m "..."` | Ask work and wait. Use for decisions and reviews. |
 | `orch send work -t T002 -m "..."` | Send work an independent task. |
-| `orch talk work -m "..." -r 6` | Start a short discussion with work. |
+| `orch talk work -m "..." -r 6` | Start a short discussion with work for up to 6 lead↔worker rounds. |
 | `orch say C001 -m "..."` | Continue a Talk Mode conversation. |
 | `orch close C001 -m "..."` | Close Talk Mode with a decision. |
 | `orch cancel T002 -m "..."` | Cancel stuck or no-longer-needed work. |

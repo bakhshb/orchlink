@@ -160,7 +160,7 @@ def test_talk_creates_conversation(monkeypatch, tmp_path):
         assert kwargs["conversation_id"] == "C001"
         assert kwargs["worker"] == "work"
         assert kwargs["message"] == "Memory or SQLite?"
-        assert kwargs["max_turns"] == 6
+        assert kwargs["max_turns"] == 12
         return {"status": "queued", "conversation_id": "C001"}
 
     monkeypatch.setattr(cli_main, "start_talk_sync", fake_start_talk_sync)
@@ -169,6 +169,7 @@ def test_talk_creates_conversation(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert "Started conversation C001" in result.output
+    assert "Max rounds: 6 (12 turns)" in result.output
     assert "Waiting for worker reply" in result.output
     assert "not a final answer" in result.output
 
@@ -234,7 +235,7 @@ def test_get_conversation_id_prints_conversation_guidance(monkeypatch, tmp_path)
     monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
 
     def fake_broker_get_sync(config, path):
-        if path == "/v1/tasks/C001":
+        if path.startswith("/v1/tasks/C001"):
             return {"status": "missing", "task_id": "C001", "error": "Task not found."}
         if path.startswith("/v1/jobs"):
             return {
@@ -277,7 +278,7 @@ def test_cancel_command_posts_cancel(monkeypatch, tmp_path):
     result = runner.invoke(cli_main.app, ["cancel", "T010", "-m", "Wrong scope."])
 
     assert result.exit_code == 0
-    assert called == {"path": "/v1/jobs/T010/cancel", "body": {"reason": "Wrong scope."}}
+    assert called == {"path": "/v1/jobs/T010/cancel", "body": {"reason": "Wrong scope.", "project_id": "demo"}}
     assert "Cancelled T010" in result.output
 
 
@@ -289,7 +290,7 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     def fake_broker_get_sync(config, path):
         if path.startswith("/v1/jobs"):
             return {"jobs": [{"task_id": "T010", "mode": "PLAN", "status": "DONE", "from_agent": "demo.lead", "to_agent": "demo.work", "created_at": "now", "preview": "Inspect tests."}]}
-        if path.startswith("/v1/tasks/T010/wait") or path == "/v1/tasks/T010":
+        if path.startswith("/v1/tasks/T010/wait") or path.startswith("/v1/tasks/T010"):
             return {"status": "DONE", "task_id": "T010", "reply": {"type": "RESULT", "payload": {"summary": "Done."}}}
         raise AssertionError(path)
 
@@ -357,7 +358,7 @@ def test_task_command_reports_in_progress(monkeypatch, tmp_path):
     monkeypatch.setattr(
         cli_main,
         "fetch_status_sync",
-        lambda broker_url, api_key: {
+        lambda broker_url, api_key, project_id=None: {
             "active_messages": [
                 {
                     "task_id": "T001",
@@ -371,7 +372,7 @@ def test_task_command_reports_in_progress(monkeypatch, tmp_path):
     monkeypatch.setattr(
         cli_main,
         "fetch_events_sync",
-        lambda broker_url, api_key, limit=500: {
+        lambda broker_url, api_key, limit=500, project_id=None: {
             "events": [
                 {
                     "task_id": "T001",

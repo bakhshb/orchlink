@@ -248,8 +248,10 @@ export default function (pi: ExtensionAPI) {
   const pollWaitSeconds = Number(env("ORCHLINK_POLL_WAIT_SECONDS", "5"));
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingTask: OrchMessage | undefined;
   let currentTask: OrchMessage | undefined;
+  let cancelNoticeSent = false;
 
   async function register() {
     if (!agentId || !role) return;
@@ -266,6 +268,43 @@ export default function (pi: ExtensionAPI) {
     if (stopped || !["lead", "work"].includes(role)) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void poll(), delayMs);
+  }
+
+  function clearCancelCheck() {
+    if (cancelTimer) clearTimeout(cancelTimer);
+    cancelTimer = undefined;
+  }
+
+  async function currentWorkStatus(task: OrchMessage): Promise<string> {
+    const projectQuery = `project_id=${encodeURIComponent(String(task.project_id || projectId || "default"))}`;
+    if (task.task_id) {
+      const body = await getJson(`/v1/tasks/${encodeURIComponent(String(task.task_id))}?${projectQuery}`);
+      return String(body.status || body.job?.status || "").toUpperCase();
+    }
+    const body = await getJson(`/v1/jobs?limit=500&${projectQuery}`);
+    const conversation = (body.jobs || []).find((job: any) => job.conversation_id === task.conversation_id);
+    return String(conversation?.status || "").toUpperCase();
+  }
+
+  async function checkCurrentTaskCancellation() {
+    if (stopped || !currentTask || cancelNoticeSent) return;
+    const status = await currentWorkStatus(currentTask);
+    if (!["CANCELLED", "TIMEOUT"].includes(status)) return;
+    cancelNoticeSent = true;
+    const label = currentTask.task_id || currentTask.conversation_id || "current work";
+    pi.sendUserMessage(`[Orchlink] ${label} is ${status}. Stop this work now, do not make more edits, and briefly acknowledge the cancellation.`, { deliverAs: "steer" });
+  }
+
+  function scheduleCancelCheck(delayMs = 5000) {
+    clearCancelCheck();
+    if (stopped || role !== "work" || !currentTask || cancelNoticeSent) return;
+    cancelTimer = setTimeout(() => {
+      void checkCurrentTaskCancellation()
+        .catch((error) => console.error(`[orchlink] cancel check failed: ${error?.message || error}`))
+        .finally(() => {
+          if (currentTask && !cancelNoticeSent) scheduleCancelCheck(5000);
+        });
+    }, delayMs);
   }
 
   async function poll() {
@@ -322,9 +361,11 @@ export default function (pi: ExtensionAPI) {
     if (!String(event.text || "").startsWith("You are the worker coding agent in")) return;
     currentTask = pendingTask;
     pendingTask = undefined;
+    cancelNoticeSent = false;
     void markMessageStatus(String(currentTask.message_id || ""), "RUNNING").catch((error) => {
       console.error(`[orchlink] status update failed: ${error?.message || error}`);
     });
+    scheduleCancelCheck(5000);
   });
 
   pi.on("message_end", async (event, ctx) => {
@@ -334,6 +375,7 @@ export default function (pi: ExtensionAPI) {
 
     const task = currentTask;
     currentTask = undefined;
+    clearCancelCheck();
     try {
       const reply = replyEnvelope(task, event.message);
       await postJson(`/v1/messages/${encodeURIComponent(task.message_id)}/reply`, reply);
@@ -349,6 +391,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     stopped = true;
     if (timer) clearTimeout(timer);
+    clearCancelCheck();
   });
 }
 '''

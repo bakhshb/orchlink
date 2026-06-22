@@ -101,8 +101,11 @@ def create_app(
         body: dict[str, Any] = Body(default_factory=dict),
         message_store: MessageStore = Depends(get_store),
     ) -> dict[str, Any]:
+        status = str(body.get("status") or "").upper()
+        if status not in {"RUNNING", "IN_PROGRESS"}:
+            raise HTTPException(status_code=400, detail="Only RUNNING or IN_PROGRESS status updates are allowed.")
         try:
-            return await message_store.update_message_status(message_id, str(body.get("status") or ""))
+            return await message_store.update_message_status(message_id, status)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -113,7 +116,11 @@ def create_app(
         message_store: MessageStore = Depends(get_store),
     ) -> dict[str, Any]:
         try:
-            return await message_store.cancel_work(item_id, str(body.get("reason") or ""))
+            return await message_store.cancel_work(
+                item_id,
+                str(body.get("reason") or ""),
+                project_id=str(body.get("project_id") or "") or None,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -133,40 +140,49 @@ def create_app(
     async def events(
         since: int = Query(default=0, ge=0),
         limit: int = Query(default=50, ge=1, le=500),
+        project_id: str | None = Query(default=None),
         message_store: MessageStore = Depends(get_store),
     ) -> dict[str, Any]:
-        recent_events = await message_store.list_events(since=since, limit=limit)
+        recent_events = await message_store.list_events(since=since, limit=limit, project_id=project_id)
         return {"events": recent_events, "last_event_id": recent_events[-1]["id"] if recent_events else since}
 
     @secure_router.get("/jobs")
     async def jobs(
         limit: int = Query(default=50, ge=1, le=500),
+        project_id: str | None = Query(default=None),
         message_store: MessageStore = Depends(get_store),
     ) -> dict[str, Any]:
-        return {"jobs": await message_store.list_jobs(limit=limit)}
+        return {"jobs": await message_store.list_jobs(limit=limit, project_id=project_id)}
 
     @secure_router.get("/tasks/{task_id}")
     async def get_task(
         task_id: str,
+        project_id: str | None = Query(default=None),
         message_store: MessageStore = Depends(get_store),
     ) -> dict[str, Any]:
-        return await message_store.get_task_result(task_id)
+        return await message_store.get_task_result(task_id, project_id=project_id)
 
     @secure_router.get("/tasks/{task_id}/wait")
     async def wait_task(
         task_id: str,
         timeout_seconds: int = Query(default=1800, ge=1),
+        project_id: str | None = Query(default=None),
         message_store: MessageStore = Depends(get_store),
     ) -> dict[str, Any]:
-        return await message_store.wait_for_task(task_id, timeout_seconds)
+        return await message_store.wait_for_task(task_id, timeout_seconds, project_id=project_id)
 
     @secure_router.get("/status")
-    async def status(message_store: MessageStore = Depends(get_store)) -> dict[str, Any]:
+    async def status(
+        project_id: str | None = Query(default=None),
+        message_store: MessageStore = Depends(get_store),
+    ) -> dict[str, Any]:
         agents = await message_store.list_agents()
-        active_messages = await message_store.list_active_messages()
-        conversations = await message_store.list_conversations()
-        jobs = await message_store.list_jobs(limit=20)
-        events = await message_store.list_events(limit=20)
+        if project_id is not None:
+            agents = [agent for agent in agents if str(agent.get("project_id") or "default") == project_id]
+        active_messages = await message_store.list_active_messages(project_id=project_id)
+        conversations = await message_store.list_conversations(project_id=project_id)
+        jobs = await message_store.list_jobs(limit=20, project_id=project_id)
+        events = await message_store.list_events(limit=20, project_id=project_id)
         pending_reply_count = 0
         count_pending = getattr(message_store, "pending_reply_count", None)
         if count_pending is not None:

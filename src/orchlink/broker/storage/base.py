@@ -34,7 +34,7 @@ class MessageStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def cancel_work(self, item_id: str, reason: str = "") -> dict[str, Any]:
+    async def cancel_work(self, item_id: str, reason: str = "", project_id: str | None = None) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
@@ -46,15 +46,15 @@ class MessageStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def wait_for_task(self, task_id: str, timeout_seconds: int) -> dict[str, Any]:
+    async def wait_for_task(self, task_id: str, timeout_seconds: int, project_id: str | None = None) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_task_result(self, task_id: str) -> dict[str, Any]:
+    async def get_task_result(self, task_id: str, project_id: str | None = None) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def list_jobs(self, limit: int = 50) -> list[dict[str, Any]]:
+    async def list_jobs(self, limit: int = 50, project_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -62,13 +62,13 @@ class MessageStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_active_messages(self) -> list[dict[str, Any]]:
+    async def list_active_messages(self, project_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError
 
     @abstractmethod
-    async def list_conversations(self) -> list[dict[str, Any]]:
+    async def list_conversations(self, project_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError
 
     @abstractmethod
-    async def list_events(self, since: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+    async def list_events(self, since: int = 0, limit: int = 100, project_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError

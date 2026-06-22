@@ -1,4 +1,5 @@
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -7,9 +8,10 @@ def _headers(api_key: str) -> dict[str, str]:
     return {"X-API-Key": api_key}
 
 
-async def fetch_status(broker_url: str, api_key: str) -> dict[str, Any]:
+async def fetch_status(broker_url: str, api_key: str, project_id: str | None = None) -> dict[str, Any]:
+    path = "/v1/status" if project_id is None else f"/v1/status?project_id={quote(project_id, safe='')}"
     async with httpx.AsyncClient(base_url=broker_url) as client:
-        response = await client.get("/v1/status", headers=_headers(api_key))
+        response = await client.get(path, headers=_headers(api_key))
         response.raise_for_status()
         return response.json()
 
@@ -19,10 +21,12 @@ async def fetch_events(
     api_key: str,
     since: int = 0,
     limit: int = 50,
+    project_id: str | None = None,
 ) -> dict[str, Any]:
+    project_query = "" if project_id is None else f"&project_id={quote(project_id, safe='')}"
     async with httpx.AsyncClient(base_url=broker_url) as client:
         response = await client.get(
-            f"/v1/events?since={since}&limit={limit}",
+            f"/v1/events?since={since}&limit={limit}{project_query}",
             headers=_headers(api_key),
         )
         response.raise_for_status()

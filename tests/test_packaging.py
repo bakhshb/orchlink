@@ -56,6 +56,8 @@ def test_pi_extension_uses_valid_record_type():
     assert "currentTask = pendingTask" in ORCHLINK_PI_EXTENSION
     assert "markMessageStatus" in ORCHLINK_PI_EXTENSION
     assert "RUNNING" in ORCHLINK_PI_EXTENSION
+    assert "checkCurrentTaskCancellation" in ORCHLINK_PI_EXTENSION
+    assert "Stop this work now" in ORCHLINK_PI_EXTENSION
     assert "Next: if worker asked a direct question" in ORCHLINK_PI_EXTENSION
     assert "-m \"<your answer>\"" in ORCHLINK_PI_EXTENSION
     assert "Talk Mode should stop only when" not in ORCHLINK_PI_EXTENSION

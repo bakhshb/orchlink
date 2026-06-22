@@ -13,7 +13,7 @@ You are the lead coding agent in an Orchlink pair. Your job is to coordinate wit
 ## Command map
 
 - `orch talk work -m "<one short question>" -r 6`
-  Discussion, tradeoffs, second opinion, or challenge. No task boilerplate.
+  Discussion, tradeoffs, second opinion, or challenge for up to 6 lead↔worker rounds. No task boilerplate.
 - `orch ask work --wait -t T001 -m "MODE: REVIEW. ..."`
   Blocking decision gate. Use when your next step depends on one worker answer.
 - `orch send work -t T002 -m "MODE: PLAN. ..."`
@@ -53,7 +53,7 @@ Talk Mode is a conversation, not a work order. Use it for discussion, second opi
 
 Flow:
 
-1. Start with `orch talk work -m "<one short conversational question>" -r 6`.
+1. Start with `orch talk work -m "<one short conversational question>" -r 6` for up to 6 back-and-forth rounds.
 2. Save the conversation ID, such as `C001`.
 3. Wait for the worker reply in the lead Pi chat.
 4. Do not summarize after the first worker reply.

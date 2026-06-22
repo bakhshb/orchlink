@@ -83,6 +83,34 @@ def test_enqueue_then_get_next_message():
     asyncio.run(run())
 
 
+def test_project_scoped_jobs_allow_same_task_id_in_different_projects():
+    async def run():
+        store = MemoryMessageStore()
+        first = task_message(project_id="p1", from_agent="p1.lead", to_agent="p1.work")
+        second = task_message(
+            project_id="p2",
+            message_id="msg-0002",
+            correlation_id="req-0002",
+            from_agent="p2.lead",
+            to_agent="p2.work",
+        )
+
+        await store.enqueue_message(first)
+        await store.enqueue_message(second)
+
+        p1_jobs = await store.list_jobs(project_id="p1")
+        p2_jobs = await store.list_jobs(project_id="p2")
+        p1_task = await store.get_task_result("TEST-001", project_id="p1")
+        p2_task = await store.get_task_result("TEST-001", project_id="p2")
+
+        assert len(p1_jobs) == 1
+        assert len(p2_jobs) == 1
+        assert p1_task["job"]["from_agent"] == "p1.lead"
+        assert p2_task["job"]["from_agent"] == "p2.lead"
+
+    asyncio.run(run())
+
+
 def test_worker_lane_rejects_second_task_until_reply():
     async def run():
         store = MemoryMessageStore()
