@@ -1,6 +1,6 @@
 # Pi Orchlink
 
-Pi Orchlink lets one Pi agent work with another Pi agent.
+Pi Orchlink lets two local coding agents talk, debate, and review each other inside your terminal — no tmux, Redis, database, or dashboard required.
 
 You run two visible Pi sessions:
 
