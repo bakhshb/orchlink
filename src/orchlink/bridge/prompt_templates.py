@@ -40,11 +40,12 @@ Transcript preview:
 {payload.get('transcript_preview') or ''}
 
 Guidance:
-- Put TYPE: CHAT_REPLY first, then answer conversationally in 2-5 short chat sentences.
+- Put TYPE: CHAT_REPLY first, then answer conversationally in 2-4 short lines. No big paragraph.
 - Answer the lead's latest question first.
 - Challenge weak assumptions. Do not agree by default.
 - Name one risk, disagreement, or assumption before accepting the lead's view, unless there is truly no meaningful objection.
 - Recommend a practical decision, or ask one direct follow-up question if the decision is not ready.
+- If the topic is broad, large, or unclear, ask one direct clarifying question instead of guessing.
 - Do not edit files, run implementation, expand scope, use headings, or write a long audit.
 - For broad repo opinions, do not read every file; use current context and a few high-signal files if useful. Ask before a broad scan.
 - If you hit a stop condition, say it plainly: clear decision, next task, blocker, max rounds, timeout, or no new value.
@@ -102,7 +103,7 @@ Rules:
 - If MODE is PLAN, inspect and propose only. No edits.
 - If MODE is REVIEW, inspect and report only. No edits unless the lead explicitly allows them.
 - If MODE is DO, implement only inside the allowed scope.
-- Return BLOCKER with specific questions if the request is unclear.
+- Return BLOCKER with specific questions if the request is unclear, too broad, or too large to scope safely.
 - If implementation is allowed, run relevant tests.
 - Do not commit unless explicitly allowed.
 

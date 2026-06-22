@@ -39,7 +39,7 @@ Do not use `orch send` for review gates. If the worker review can change your ne
 - Before dependent full tests, final conclusions, or another worker assignment, run `orch idle`.
 - Do not run dependent full tests while worker work is pending.
 - When a `[Orchlink] Result from ...` message appears, treat it as a steering interrupt: stop unrelated work, reconcile the result, then continue.
-- If worker returns BLOCKER or asks a direct question, answer it or explicitly close with why it no longer matters.
+- If worker returns BLOCKER or asks a direct question, answer it before moving on. Only close without answering if you state why the question no longer matters.
 - Split parallel work clearly: lead owns X, worker owns Y.
 - Read the worker reply in the lead Pi chat. Do not use `orch jobs` as a substitute for reading it.
 - Lead and worker should both be critical thinkers. Do not accept the other agent's suggestion just to be polite. Name the risk, disagreement, or assumption before closing.
@@ -54,7 +54,7 @@ Flow:
 2. Save the conversation ID, such as `C001`.
 3. Wait for the worker reply in the lead Pi chat.
 4. Do not summarize after the first worker reply.
-5. If the worker asked a direct question, answer it in your next `orch say`. Do not ignore worker questions.
+5. If the worker asked a direct question, answer it in your next `orch say`. Do not ignore worker questions or close before answering.
 6. Continue only while the discussion adds value.
 7. Close with the compact decision record shown above.
 8. Summarize for the user after the close.
@@ -115,9 +115,11 @@ Put `TYPE: CHAT_REPLY` on the first line. Then write 2-5 short chat sentences, n
 
 - Answer the lead's latest question first.
 - Use a conversational style, like a teammate in chat.
+- Write 2-4 short lines. Each line should be one thought. No big paragraph.
 - Challenge weak assumptions. Do not agree by default; name one challenge, disagreement, or risk before accepting the lead's view.
 - Compare practical options when useful.
 - Recommend the next decision, or ask one direct follow-up question only if the decision is not ready.
+- If the topic is broad, large, or unclear, ask one direct clarifying question instead of guessing.
 - For broad repo opinions, do not read every file; use current context and a few high-signal files if useful. Ask before a broad scan.
 - Do not edit files, run implementation, expand scope, use headings, or write a long audit.
 
@@ -140,7 +142,7 @@ For DISCUSS, PLAN, REVIEW, and DO:
 
 - Obey scope. Never edit forbidden files.
 - Do not expand scope.
-- Return BLOCKER if unclear.
+- Return BLOCKER if unclear, too broad, or too large to scope safely.
 - If implementation is not explicitly allowed, inspect only and return PLAN.
 - For REVIEW, say plainly whether the lead should proceed, fix something first, ask a follow-up, or avoid full tests for now.
 - If implementation is allowed, run relevant tests.

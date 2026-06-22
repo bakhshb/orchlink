@@ -50,6 +50,8 @@ def test_render_worker_prompt_uses_talk_shape():
     assert "not a task assignment" in prompt
     assert "Conversation ID:\nC001" in prompt
     assert "Challenge weak assumptions" in prompt
+    assert "No big paragraph" in prompt
+    assert "broad, large, or unclear" in prompt
     assert "do not read every file" in prompt
     assert "answer conversationally" in prompt
     assert "no new value" in prompt

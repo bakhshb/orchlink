@@ -52,6 +52,9 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert "## Modes" in work_skill
     assert "TALK: discuss" in work_skill
     assert "For TALK, behave like a collaborator" in work_skill
+    assert "No big paragraph" in work_skill
+    assert "Do not agree by default" in work_skill
+    assert "too broad" in work_skill
     assert "ignore the command framing" in work_skill
     assert "read every file" in work_skill
     assert "Stop conditions for TALK" in work_skill
