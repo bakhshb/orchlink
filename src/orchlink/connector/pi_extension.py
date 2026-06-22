@@ -284,7 +284,7 @@ export default function (pi: ExtensionAPI) {
             content: `Orchlink received ${message?.type || "MESSAGE"} ${label} from ${message?.from_agent || "lead"}`,
             display: true,
             details: message,
-          }, { deliverAs: "nextTurn" });
+          }, { deliverAs: "steer" });
           if (message?.type === "CHAT_CLOSE") {
             return;
           }
@@ -296,7 +296,7 @@ export default function (pi: ExtensionAPI) {
             content: `Orchlink received ${message?.type || "RESULT"} ${label} from ${message?.from_agent || "work"}`,
             display: true,
             details: message,
-          }, { deliverAs: "nextTurn" });
+          }, { deliverAs: "steer" });
           pi.sendUserMessage(renderLeadPrompt(message), { deliverAs: "steer" });
         }
       }
@@ -336,7 +336,7 @@ export default function (pi: ExtensionAPI) {
         content: `Orchlink sent ${reply.type} for ${label} to ${task.from_agent}`,
         display: true,
         details: reply,
-      }, { deliverAs: "nextTurn" });
+      }, { deliverAs: "steer" });
     } catch (error: any) {
       ctx.ui.notify(`Orchlink reply failed: ${error?.message || error}`, "error");
     } finally {

@@ -49,6 +49,7 @@ def test_pi_extension_uses_valid_record_type():
     assert "no new value" in ORCHLINK_PI_EXTENSION
     assert "Talk Mode should stop only when" in ORCHLINK_PI_EXTENSION
     assert "renderLeadPrompt(message), { deliverAs: \"steer\" }" in ORCHLINK_PI_EXTENSION
+    assert "deliverAs: \"nextTurn\"" not in ORCHLINK_PI_EXTENSION
     assert "Stop any unrelated work now" in ORCHLINK_PI_EXTENSION
 
 
