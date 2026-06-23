@@ -249,9 +249,11 @@ export default function (pi: ExtensionAPI) {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancelTimer: ReturnType<typeof setTimeout> | undefined;
+  let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingTask: OrchMessage | undefined;
   let currentTask: OrchMessage | undefined;
   let cancelNoticeSent = false;
+  const recoveryGraceMs = Math.max(1000, Number(env("ORCHLINK_RECOVERABLE_ERROR_GRACE_MS", "180000")) || 180000);
 
   async function register() {
     if (!agentId || !role) return;
@@ -273,6 +275,42 @@ export default function (pi: ExtensionAPI) {
   function clearCancelCheck() {
     if (cancelTimer) clearTimeout(cancelTimer);
     cancelTimer = undefined;
+  }
+
+  function clearRecoveryTimer() {
+    if (recoveryTimer) clearTimeout(recoveryTimer);
+    recoveryTimer = undefined;
+  }
+
+  function isRecoverableAssistantError(assistantMessage: any): boolean {
+    if (assistantMessage?.stopReason !== "error") return false;
+    const errorText = `${assistantMessage?.errorMessage || ""} ${JSON.stringify(assistantMessage?.diagnostics || [])}`;
+    return /WebSocket error|provider_transport_failure|transport/i.test(errorText);
+  }
+
+  async function sendReply(task: OrchMessage, assistantMessage: any, ctx: any) {
+    try {
+      const reply = replyEnvelope(task, assistantMessage);
+      await postJson(`/v1/messages/${encodeURIComponent(task.message_id)}/reply`, reply);
+      const label = task.task_id || task.conversation_id;
+      ctx.ui.notify(`Orchlink reply sent for ${label}`, "info");
+    } catch (error: any) {
+      ctx.ui.notify(`Orchlink reply failed: ${error?.message || error}`, "error");
+    } finally {
+      schedule(0);
+    }
+  }
+
+  function deferRecoverableFailure(task: OrchMessage, assistantMessage: any, ctx: any) {
+    clearRecoveryTimer();
+    const label = task.task_id || task.conversation_id || "current work";
+    ctx.ui.notify(`Orchlink saw a transient provider error for ${label}; waiting for Pi recovery.`, "info");
+    recoveryTimer = setTimeout(() => {
+      if (!currentTask || currentTask.message_id !== task.message_id) return;
+      currentTask = undefined;
+      clearCancelCheck();
+      void sendReply(task, assistantMessage, ctx);
+    }, recoveryGraceMs);
   }
 
   async function currentWorkStatus(task: OrchMessage): Promise<string> {
@@ -374,24 +412,22 @@ export default function (pi: ExtensionAPI) {
     if ((event.message as any).stopReason === "toolUse") return;
 
     const task = currentTask;
+    if (isRecoverableAssistantError(event.message)) {
+      deferRecoverableFailure(task, event.message, ctx);
+      return;
+    }
+
+    clearRecoveryTimer();
     currentTask = undefined;
     clearCancelCheck();
-    try {
-      const reply = replyEnvelope(task, event.message);
-      await postJson(`/v1/messages/${encodeURIComponent(task.message_id)}/reply`, reply);
-      const label = task.task_id || task.conversation_id;
-      ctx.ui.notify(`Orchlink reply sent for ${label}`, "info");
-    } catch (error: any) {
-      ctx.ui.notify(`Orchlink reply failed: ${error?.message || error}`, "error");
-    } finally {
-      schedule(0);
-    }
+    await sendReply(task, event.message, ctx);
   });
 
   pi.on("session_shutdown", async () => {
     stopped = true;
     if (timer) clearTimeout(timer);
     clearCancelCheck();
+    clearRecoveryTimer();
   });
 }
 '''

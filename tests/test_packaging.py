@@ -58,12 +58,29 @@ def test_pi_extension_uses_valid_record_type():
     assert "RUNNING" in ORCHLINK_PI_EXTENSION
     assert "checkCurrentTaskCancellation" in ORCHLINK_PI_EXTENSION
     assert "Stop this work now" in ORCHLINK_PI_EXTENSION
+    assert "isRecoverableAssistantError" in ORCHLINK_PI_EXTENSION
+    assert "ORCHLINK_RECOVERABLE_ERROR_GRACE_MS" in ORCHLINK_PI_EXTENSION
+    assert "180000" in ORCHLINK_PI_EXTENSION
+    assert "WebSocket error|provider_transport_failure|transport" in ORCHLINK_PI_EXTENSION
+    assert "waiting for Pi recovery" in ORCHLINK_PI_EXTENSION
     assert "Next: if worker asked a direct question" in ORCHLINK_PI_EXTENSION
     assert "-m \"<your answer>\"" in ORCHLINK_PI_EXTENSION
     assert "Talk Mode should stop only when" not in ORCHLINK_PI_EXTENSION
     assert "renderLeadPrompt(message), { deliverAs: \"steer\" }" in ORCHLINK_PI_EXTENSION
     assert "deliverAs: \"nextTurn\"" not in ORCHLINK_PI_EXTENSION
     assert "Stop any unrelated work now" in ORCHLINK_PI_EXTENSION
+
+
+def test_pi_extension_keeps_current_task_during_recoverable_transport_error():
+    from orchlink.connector.pi_extension import ORCHLINK_PI_EXTENSION
+
+    assert """if (isRecoverableAssistantError(event.message)) {
+      deferRecoverableFailure(task, event.message, ctx);
+      return;
+    }
+
+    clearRecoveryTimer();
+    currentTask = undefined;""" in ORCHLINK_PI_EXTENSION
 
 
 def test_broker_run_command_is_registered_without_starting_server(monkeypatch):

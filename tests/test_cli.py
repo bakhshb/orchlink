@@ -311,6 +311,29 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     assert "Done." in wait_result.output
 
 
+def test_get_failed_task_prints_stderr(monkeypatch, tmp_path):
+    init_project(tmp_path, project_id="demo")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
+    monkeypatch.setattr(
+        cli_main,
+        "broker_get_sync",
+        lambda config, path: {
+            "status": "FAILED",
+            "task_id": "T010",
+            "reply": {"type": "BLOCKER", "payload": {"summary": "", "stderr": "WebSocket error"}},
+        },
+    )
+
+    result = runner.invoke(cli_main.app, ["get", "T010"])
+
+    assert result.exit_code == 0
+    assert "Task T010: FAILED" in result.output
+    assert "Type: BLOCKER" in result.output
+    assert "Stderr" in result.output
+    assert "WebSocket error" in result.output
+
+
 def test_idle_reports_ready_when_no_pending_jobs(monkeypatch, tmp_path):
     init_project(tmp_path, project_id="demo")
     monkeypatch.chdir(tmp_path)

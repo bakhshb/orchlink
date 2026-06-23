@@ -601,8 +601,12 @@ def _print_task_body(body: dict[str, Any]) -> None:
         console.print(f"[Orch] Type: {reply.get('type', 'RESULT')}")
         payload = reply.get("payload") or {}
         summary = str(payload.get("summary") or payload.get("stdout") or "").strip()
+        stderr = str(payload.get("stderr") or "").strip()
         if summary:
             console.print(summary)
+        if stderr:
+            console.print("[Orch] Stderr:")
+            console.print(stderr)
     elif body.get("job"):
         job = body["job"]
         console.print(f"[Orch] Route: {job.get('from_agent', '-')} → {job.get('to_agent', '-')}")
