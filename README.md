@@ -236,6 +236,25 @@ Use `--new` when you want fresh Pi chats with the latest Orchlink instructions.
 
 For real-session validation beyond unit tests, run the manual smoke plan in [`docs/manual-smoke-test.md`](docs/manual-smoke-test.md).
 
+## OpenClaw and Hermes adapter skills
+
+This repo includes adapter skills for using OpenClaw or Hermes as the Orchlink lead while Pi runs the visible `work` session:
+
+```text
+skills/openclaw/orchlink/SKILL.md
+skills/hermes/orchlink/SKILL.md
+```
+
+Developer symlink install:
+
+```bash
+mkdir -p ~/.openclaw/skills ~/.hermes/skills
+ln -sfn /home/debian/projects/orchlink/skills/openclaw/orchlink ~/.openclaw/skills/orchlink
+ln -sfn /home/debian/projects/orchlink/skills/hermes/orchlink ~/.hermes/skills/orchlink
+```
+
+Start a new OpenClaw/Hermes session after changing skill files.
+
 ## Advanced commands
 
 You normally do not need these. The lead agent uses them when it coordinates with work.
