@@ -263,7 +263,6 @@ Debug-only commands:
 | Command | Use |
 | --- | --- |
 | `orch watch` | Watch broker events, including worker activity heartbeats/tool calls. |
-| `orch work --no-pi` | Run the worker listener without opening Pi. |
 | `orch broker run --host 127.0.0.1 --port 8787` | Run the broker by hand. |
 
 ## Configuration

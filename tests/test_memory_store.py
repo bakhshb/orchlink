@@ -8,13 +8,13 @@ from orchlink.broker.storage.memory import MemoryMessageStore
 
 def task_message(**overrides):
     data = {
-        "protocol": "orchlink-a2a-v1",
+        "protocol": "orch-a2a-v1",
         "message_id": "msg-0001",
         "correlation_id": "req-0001",
         "conversation_id": "orchlink-test",
         "task_id": "TEST-001",
-        "from_agent": "orchestrator",
-        "to_agent": "worker-backend",
+        "from_agent": "demo.lead",
+        "to_agent": "demo.work",
         "type": "TASK",
         "status": "PENDING",
         "turn": 1,
@@ -29,13 +29,13 @@ def task_message(**overrides):
 
 def reply_message():
     return {
-        "protocol": "orchlink-a2a-v1",
+        "protocol": "orch-a2a-v1",
         "message_id": "reply-0001",
         "correlation_id": "req-0001",
         "conversation_id": "orchlink-test",
         "task_id": "TEST-001",
-        "from_agent": "worker-backend",
-        "to_agent": "orchestrator",
+        "from_agent": "demo.work",
+        "to_agent": "demo.lead",
         "type": "PLAN",
         "status": "COMPLETED",
         "turn": 2,
@@ -50,7 +50,7 @@ def test_register_agent_creates_agent_and_inbox():
     async def run():
         store = MemoryMessageStore()
         agent = {
-            "agent_id": "worker-backend",
+            "agent_id": "demo.work",
             "role": "worker",
             "display_name": "Backend Worker",
             "capabilities": ["backend"],
@@ -70,7 +70,7 @@ def test_enqueue_then_get_next_message():
         message = task_message()
 
         queued = await store.enqueue_message(message)
-        received = await store.get_next_message("worker-backend", wait_seconds=1)
+        received = await store.get_next_message("demo.work", wait_seconds=1)
 
         active_messages = await store.list_active_messages()
 
@@ -174,7 +174,7 @@ def test_get_next_message_returns_none_after_wait_timeout():
     async def run():
         store = MemoryMessageStore()
 
-        received = await store.get_next_message("worker-backend", wait_seconds=0)
+        received = await store.get_next_message("demo.work", wait_seconds=0)
 
         assert received is None
 
@@ -287,7 +287,7 @@ def test_chat_reply_queues_reply_for_lead_inbox():
         await store.enqueue_message(message)
         await store.save_reply("msg-chat", reply)
 
-        delivered = await store.get_next_message("orchestrator", wait_seconds=1)
+        delivered = await store.get_next_message("demo.lead", wait_seconds=1)
 
         assert delivered is not None
         assert delivered["type"] == "CHAT_REPLY"
@@ -302,13 +302,13 @@ def test_save_reply_queues_reply_for_lead_inbox():
         await store.enqueue_message(task_message())
         await store.save_reply("msg-0001", reply_message())
 
-        delivered = await store.get_next_message("orchestrator", wait_seconds=1)
+        delivered = await store.get_next_message("demo.lead", wait_seconds=1)
 
         jobs = await store.list_jobs()
 
         assert delivered is not None
         assert delivered["type"] == "PLAN"
-        assert delivered["to_agent"] == "orchestrator"
+        assert delivered["to_agent"] == "demo.lead"
         assert jobs[0]["task_id"] == "TEST-001"
         assert jobs[0]["status"] == "DONE"
 
@@ -350,7 +350,7 @@ def test_cancel_work_skips_queued_message_and_frees_worker_lane():
         await store.enqueue_message(task_message())
 
         cancelled = await store.cancel_work("TEST-001", "No longer needed.")
-        skipped = await store.get_next_message("worker-backend", wait_seconds=0)
+        skipped = await store.get_next_message("demo.work", wait_seconds=0)
         queued = await store.enqueue_message(task_message(message_id="msg-0002", correlation_id="req-0002", task_id="TEST-002"))
         task = await store.get_task_result("TEST-001")
 

@@ -24,7 +24,6 @@ dev = ["pytest"]
 
 [project.scripts]
 orch = "orchlink.cli.main:app"
-orchlink = "orchlink.cli.main:app"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -4,8 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 PROTOCOL_VERSION = "orch-a2a-v1"
-LEGACY_PROTOCOL_VERSION = "orchlink-a2a-v1"
-SUPPORTED_PROTOCOL_VERSIONS = {PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION}
 
 MessageType = Literal[
     "TASK",
@@ -35,7 +33,7 @@ MessageStatus = Literal[
 ]
 MessageMode = Literal["DISCUSS", "PLAN", "DO", "REVIEW", "TALK"]
 DeliveryMode = Literal["blocking", "async", "conversation"]
-AgentRole = Literal["lead", "worker", "orchestrator"]
+AgentRole = Literal["lead", "worker"]
 
 
 class Scope(BaseModel):
@@ -91,7 +89,7 @@ class MessageEnvelope(BaseModel):
     @field_validator("protocol")
     @classmethod
     def protocol_must_match(cls, value: str) -> str:
-        if value not in SUPPORTED_PROTOCOL_VERSIONS:
+        if value != PROTOCOL_VERSION:
             raise ValueError(f"unsupported protocol: {value}")
         return value
 

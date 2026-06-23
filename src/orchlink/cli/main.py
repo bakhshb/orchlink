@@ -13,7 +13,6 @@ from typing import Annotated, Any
 import httpx
 import typer
 import uvicorn
-import yaml
 from rich.console import Console
 
 from orchlink.bridge.ask import (
@@ -24,9 +23,7 @@ from orchlink.bridge.ask import (
     say_talk_sync,
     start_talk_sync,
 )
-from orchlink.bridge.listener import run_worker_loop
 from orchlink.bridge.monitor import fetch_events, fetch_status, format_event
-from orchlink.bridge.orchestrator_bridge import ask_worker_sync
 from orchlink.connector.pi_connector import PiConnector, PiConnectorError
 from orchlink.project.config import (
     ProjectConfigError,
@@ -51,8 +48,6 @@ def discover_project_root() -> Path:
 
 
 PROJECT_ROOT = discover_project_root()
-DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
-
 app = typer.Typer(help="Local broker and connector for two Pi coding-agent sessions.")
 broker_app = typer.Typer(help="Run and manage the local Orchlink broker.")
 app.add_typer(broker_app, name="broker")
@@ -77,51 +72,6 @@ def print_orch_exception(exc: Exception) -> None:
             console.print(f"[Orch] {detail}")
             return
     console.print(f"[Orch] {exc}")
-
-
-def resolve_config_dir(config_dir: Path | None = None) -> Path:
-    if config_dir is not None:
-        return config_dir
-    env_config_dir = os.getenv("ORCHLINK_CONFIG_DIR")
-    if env_config_dir:
-        return Path(env_config_dir)
-    return DEFAULT_CONFIG_DIR
-
-
-def load_role_config(role: str, config_dir: Path | None = None) -> dict[str, Any]:
-    path = resolve_config_dir(config_dir) / f"{role}.yaml"
-    with path.open("r", encoding="utf-8") as file:
-        data = yaml.safe_load(file) or {}
-    return data
-
-
-def config_api_key(config: dict[str, Any]) -> str:
-    return os.getenv("ORCHLINK_API_KEY") or str(config.get("api_key", "change-me"))
-
-
-def config_broker_url(config: dict[str, Any]) -> str:
-    return str(config.get("broker_url", "http://127.0.0.1:8787"))
-
-
-async def register_agent(config: dict[str, Any]) -> dict[str, Any]:
-    async with httpx.AsyncClient(base_url=config_broker_url(config)) as client:
-        response = await client.post(
-            "/v1/agents/register",
-            headers={"X-API-Key": config_api_key(config)},
-            json={
-                "project_id": str(config.get("project_id", "default")),
-                "agent_id": config.get("agent_id"),
-                "role": config.get("role"),
-                "display_name": config.get("display_name", config.get("agent_id")),
-                "capabilities": config.get("capabilities", []),
-            },
-        )
-        response.raise_for_status()
-        return response.json()
-
-
-def register_agent_sync(config: dict[str, Any]) -> dict[str, Any]:
-    return asyncio.run(register_agent(config))
 
 
 async def register_project_role(config: dict[str, Any], role: str) -> dict[str, Any]:
@@ -288,6 +238,9 @@ def run_update(ref: str, reinstall_only: bool = False) -> None:
             subprocess.run(["git", "-C", str(root), "pull", "--ff-only", "origin", ref], check=True)
 
     subprocess.run([sys.executable, "-m", "pip", "install", "-e", str(root)], check=True)
+    for old_alias in (Path(sys.executable).parent / "orchlink", Path.home() / ".local" / "bin" / "orchlink"):
+        if old_alias.is_file() or old_alias.is_symlink():
+            old_alias.unlink()
 
 
 def broker_health(url: str) -> bool:
@@ -304,14 +257,6 @@ def broker_pid_path(config: dict[str, Any]) -> Path:
 
 def broker_log_path(config: dict[str, Any]) -> Path:
     return run_dir(config) / "broker.log"
-
-
-def worker_listener_pid_path(config: dict[str, Any]) -> Path:
-    return run_dir(config) / "work-listener.pid"
-
-
-def worker_listener_log_path(config: dict[str, Any]) -> Path:
-    return run_dir(config) / "work-listener.log"
 
 
 def pid_is_running(pid: int) -> bool:
@@ -370,37 +315,6 @@ def ensure_broker_running(config: dict[str, Any]) -> None:
     if not broker_auto_start(config):
         raise RuntimeError(f"Broker is not reachable at {url} and auto_start is disabled.")
     start_background_broker(config)
-
-
-def start_background_worker_listener(config: dict[str, Any]) -> None:
-    pid_path = worker_listener_pid_path(config)
-    if pid_path.is_file():
-        try:
-            pid = int(pid_path.read_text(encoding="utf-8").strip())
-        except ValueError:
-            pid = 0
-        if pid and pid_is_running(pid):
-            return
-        pid_path.unlink(missing_ok=True)
-
-    directory = run_dir(config)
-    directory.mkdir(parents=True, exist_ok=True)
-    log_path = worker_listener_log_path(config)
-    command = [sys.executable, "-m", "orchlink.cli.main", "work-listen"]
-    with log_path.open("ab") as log_file:
-        process = subprocess.Popen(
-            command,
-            cwd=project_root(config),
-            env=os.environ.copy(),
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-    pid_path.write_text(str(process.pid), encoding="utf-8")
-    time.sleep(0.2)
-    if process.poll() is not None:
-        pid_path.unlink(missing_ok=True)
-        raise RuntimeError(f"Worker listener exited during startup. See {log_path}")
 
 
 def with_new_pi_session(config: dict[str, Any], role: str) -> tuple[dict[str, Any], str]:
@@ -463,7 +377,6 @@ def init_command(
 
 @app.command()
 def lead(
-    no_pi: Annotated[bool, typer.Option("--no-pi", help="Prepare/register but do not launch Pi.")] = False,
     new: Annotated[bool, typer.Option("--new", help="Start a new Pi lead session instead of reopening the saved lead session.")] = False,
 ) -> None:
     config = load_project_or_exit()
@@ -478,8 +391,6 @@ def lead(
         console.print("[Orch] Worker available: work")
         console.print("[Orch] Starting Pi lead session...")
         console.print("[Orch] Lead will listen for worker replies and talk messages.")
-        if no_pi:
-            return
         exit_code = PiConnector(config).run_lead()
     except (RuntimeError, PiConnectorError, httpx.HTTPError) as exc:
         console.print(f"[Orch] {exc}")
@@ -489,8 +400,6 @@ def lead(
 
 @app.command()
 def work(
-    once: Annotated[bool, typer.Option("--once", help="Process at most one poll/message then exit without launching Pi.")] = False,
-    no_pi: Annotated[bool, typer.Option("--no-pi", help="Run only the task listener; do not launch the visible Pi session.")] = False,
     new: Annotated[bool, typer.Option("--new", help="Start a new Pi worker session instead of reopening the saved worker session.")] = False,
 ) -> None:
     config = load_project_or_exit()
@@ -503,11 +412,6 @@ def work(
             config, session_id = with_new_pi_session(config, "work")
             console.print(f"[Orch] New Pi worker session: {session_id}")
 
-        if once or no_pi:
-            console.print("[Orch] Waiting for tasks...")
-            asyncio.run(run_worker_loop(config, once=once, console=console, register=False))
-            return
-
         connector = PiConnector(config)
         if not connector.check_available():
             raise PiConnectorError(f"Pi command not found: {connector.pi_command()}")
@@ -518,15 +422,6 @@ def work(
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
     raise typer.Exit(exit_code)
-
-
-@app.command("work-listen", hidden=True)
-def work_listen(
-    once: Annotated[bool, typer.Option("--once")] = False,
-) -> None:
-    config = load_project_or_exit()
-    ensure_broker_running(config)
-    asyncio.run(run_worker_loop(config, once=once, console=None, register=True))
 
 
 def print_async_guidance(config: dict[str, Any], worker_id: str, task_id: str) -> None:
@@ -542,37 +437,24 @@ def ask(
     worker_id: str,
     task_id: Annotated[str, typer.Option("--task", "--task-id", "-t")],
     message: Annotated[str, typer.Option("--msg", "--message", "-m")],
-    config_dir: Annotated[Path | None, typer.Option("--config-dir")] = None,
     timeout_seconds: Annotated[int, typer.Option("--timeout-seconds")] = 1800,
     wait: Annotated[bool, typer.Option("--wait/--no-wait", help="Wait in this shell for the reply. Use orch send for async tasks.")] = True,
 ) -> None:
-    if config_dir is not None:
-        config = load_role_config("orchestrator", config_dir)
-        response = ask_worker_sync(
-            broker_url=config_broker_url(config),
-            api_key=config_api_key(config),
-            worker_id=worker_id,
+    config = load_project_or_exit()
+    try:
+        ensure_broker_running(config)
+        response = project_ask_worker_sync(
+            config=config,
+            worker=worker_id,
             task_id=task_id,
             message=message,
-            from_agent=str(config.get("agent_id", "orchestrator")),
             timeout_seconds=timeout_seconds,
+            wait=wait,
         )
-    else:
-        config = load_project_or_exit()
-        try:
-            ensure_broker_running(config)
-            response = project_ask_worker_sync(
-                config=config,
-                worker=worker_id,
-                task_id=task_id,
-                message=message,
-                timeout_seconds=timeout_seconds,
-                wait=wait,
-            )
-        except (RuntimeError, httpx.HTTPError) as exc:
-            print_orch_exception(exc)
-            raise typer.Exit(1) from exc
-    if config_dir is None and not wait:
+    except (RuntimeError, httpx.HTTPError) as exc:
+        print_orch_exception(exc)
+        raise typer.Exit(1) from exc
+    if not wait:
         print_async_guidance(config, worker_id, task_id)
     console.print_json(json.dumps(response))
 
@@ -1010,35 +892,7 @@ def watch(
 @app.command()
 def stop() -> None:
     config = load_project_or_exit()
-    stop_pid_file(worker_listener_pid_path(config), "worker listener")
     stop_pid_file(broker_pid_path(config), "broker")
-
-
-@app.command()
-def start(
-    role: str,
-    config_dir: Annotated[Path | None, typer.Option("--config-dir")] = None,
-    once: Annotated[bool, typer.Option("--once")] = False,
-) -> None:
-    config = load_role_config(role, config_dir)
-    console.print(f"[Orchlink] Broker online: {config_broker_url(config)}")
-    register_agent_sync(config)
-    console.print(f"[Orchlink] Registered: {config.get('agent_id', role)}")
-
-    if role == "orchestrator":
-        for worker in config.get("workers", []):
-            worker_id = worker.get("agent_id")
-            console.print(f"[Orchlink] Available worker: {worker_id}")
-        console.print("[Orchlink] Delegate with: orch ask work --task <TASK_ID> --msg <TASK_MESSAGE>")
-        console.print("[Orchlink] Legacy: orchlink ask worker-backend --task-id <TASK_ID> --message <TASK_MESSAGE>")
-        return
-
-    if role == "worker-backend":
-        console.print("[Orchlink] Waiting for tasks...")
-        asyncio.run(run_worker_loop(config, once=once))
-        return
-
-    raise typer.BadParameter(f"Unknown role: {role}")
 
 
 @app.command()
@@ -1051,23 +905,7 @@ def status(
 
 
 @app.command()
-def monitor(
-    broker_url_option: Annotated[str, typer.Option("--broker-url")] = "http://127.0.0.1:8787",
-    api_key: Annotated[str, typer.Option("--api-key")] = "change-me",
-    interval_seconds: Annotated[float, typer.Option("--interval-seconds")] = 2.0,
-    iterations: Annotated[int, typer.Option("--iterations")] = 1,
-) -> None:
-    for _ in range(iterations):
-        response = fetch_status_sync(broker_url_option, api_key)
-        console.print_json(json.dumps(response))
-        if iterations > 1:
-            time.sleep(interval_seconds)
-
-
-@app.command()
-def doctor(
-    config_dir: Annotated[Path | None, typer.Option("--config-dir")] = None,
-) -> None:
+def doctor() -> None:
     console.print("Orchlink doctor")
     console.print(f"Package file: {Path(__file__).resolve()}")
     console.print(f"Project root: {PROJECT_ROOT}")
@@ -1102,8 +940,7 @@ def doctor(
         else:
             console.print("Project .orch files: current")
 
-    console.print("Global CLI symlink: ~/.local/bin/orch -> <orchlink-repo>/.venv/bin/orch")
-    console.print("Legacy CLI symlink: ~/.local/bin/orchlink -> <orchlink-repo>/.venv/bin/orchlink")
+    console.print("CLI symlink: ~/.local/bin/orch -> <orchlink-repo>/.venv/bin/orch")
 
 
 if __name__ == "__main__":

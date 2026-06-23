@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 
 from typer.testing import CliRunner
@@ -8,45 +7,6 @@ from orchlink.project.init import init_project
 
 
 runner = CliRunner()
-
-
-def test_ask_command_prints_reply(monkeypatch, tmp_path):
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    (config_dir / "orchestrator.yaml").write_text(
-        "agent_id: orchestrator\n"
-        "role: orchestrator\n"
-        "display_name: Orchestrator\n"
-        "broker_url: http://127.0.0.1:8787\n"
-        "api_key: test-key\n",
-        encoding="utf-8",
-    )
-
-    def fake_ask_worker_sync(**kwargs):
-        assert kwargs["worker_id"] == "worker-backend"
-        assert kwargs["task_id"] == "TEST-001"
-        assert kwargs["message"] == "Return PLAN only."
-        return {"status": "completed", "reply": {"type": "PLAN", "payload": {"summary": "done"}}}
-
-    monkeypatch.setattr(cli_main, "ask_worker_sync", fake_ask_worker_sync)
-
-    result = runner.invoke(
-        cli_main.app,
-        [
-            "ask",
-            "worker-backend",
-            "--task-id",
-            "TEST-001",
-            "--message",
-            "Return PLAN only.",
-            "--config-dir",
-            str(config_dir),
-        ],
-    )
-
-    assert result.exit_code == 0
-    assert '"status": "completed"' in result.output
-    assert '"type": "PLAN"' in result.output
 
 
 def test_project_ask_defaults_to_wait(monkeypatch, tmp_path):
@@ -500,33 +460,6 @@ def test_task_command_reports_in_progress(monkeypatch, tmp_path):
     assert "read:" in result.output
     assert "apps/api/app/api/users.py" in result.output
     assert "Worker is still in progress" in result.output
-
-
-def test_start_orchestrator_prints_guidance(monkeypatch, tmp_path):
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    (config_dir / "orchestrator.yaml").write_text(
-        "agent_id: orchestrator\n"
-        "role: orchestrator\n"
-        "display_name: Orchestrator\n"
-        "broker_url: http://127.0.0.1:8787\n"
-        "api_key: test-key\n"
-        "workers:\n"
-        "  - agent_id: worker-backend\n",
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(cli_main, "register_agent_sync", lambda config: {"status": "registered"})
-
-    result = runner.invoke(
-        cli_main.app,
-        ["start", "orchestrator", "--config-dir", str(config_dir)],
-    )
-
-    assert result.exit_code == 0
-    assert "[Orchlink] Registered: orchestrator" in result.output
-    assert "[Orchlink] Available worker: worker-backend" in result.output
-    assert "orchlink ask worker-backend" in result.output
 
 
 def test_work_command_starts_visible_pi(monkeypatch, tmp_path):

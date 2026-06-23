@@ -41,7 +41,7 @@ def test_register_agent():
         "/v1/agents/register",
         headers=auth_headers(),
         json={
-            "agent_id": "worker-backend",
+            "agent_id": "demo.work",
             "role": "worker",
             "display_name": "Backend Worker",
             "capabilities": ["backend", "tests"],
@@ -49,7 +49,7 @@ def test_register_agent():
     )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "registered", "agent_id": "worker-backend"}
+    assert response.json() == {"status": "registered", "agent_id": "demo.work"}
 
 
 def test_send_message_queues_without_waiting():
@@ -334,7 +334,7 @@ def test_get_next_returns_empty_when_no_message_arrives():
     client = make_client()
 
     response = client.get(
-        "/v1/agents/worker-backend/next?wait_seconds=0",
+        "/v1/agents/demo.work/next?wait_seconds=0",
         headers=auth_headers(),
     )
 
@@ -348,9 +348,9 @@ def test_status_reports_basic_counts():
         "/v1/agents/register",
         headers=auth_headers(),
         json={
-            "agent_id": "orchestrator",
-            "role": "orchestrator",
-            "display_name": "Orchestrator",
+            "agent_id": "demo.lead",
+            "role": "lead",
+            "display_name": "Lead",
             "capabilities": [],
         },
     )

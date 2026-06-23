@@ -203,15 +203,14 @@ install_package() {
   "$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null
   "$VENV_DIR/bin/python" -m pip install -e "$INSTALL_DIR"
   mkdir -p "$BIN_DIR"
+  rm -f "$BIN_DIR/orchlink"
   ln -sf "$VENV_DIR/bin/orch" "$BIN_DIR/orch"
-  ln -sf "$VENV_DIR/bin/orchlink" "$BIN_DIR/orchlink"
 }
 
 print_success() {
   log "Installed Orchlink"
   printf "\n%sCommands:%s\n" "$BOLD" "$RESET"
   printf "  %s/orch\n" "$BIN_DIR"
-  printf "  %s/orchlink\n" "$BIN_DIR"
   printf "\n"
   if command -v orch >/dev/null 2>&1; then
     log "orch is available on PATH: $(command -v orch)"

@@ -12,13 +12,13 @@ HEADERS = {"X-API-Key": "test-key"}
 
 def task_message():
     return {
-        "protocol": "orchlink-a2a-v1",
+        "protocol": "orch-a2a-v1",
         "message_id": "msg-0001",
         "correlation_id": "req-0001",
         "conversation_id": "orchlink-test",
         "task_id": "TEST-001",
-        "from_agent": "orchestrator",
-        "to_agent": "worker-backend",
+        "from_agent": "demo.lead",
+        "to_agent": "demo.work",
         "type": "TASK",
         "status": "PENDING",
         "turn": 1,
@@ -31,13 +31,13 @@ def task_message():
 
 def reply_message():
     return {
-        "protocol": "orchlink-a2a-v1",
+        "protocol": "orch-a2a-v1",
         "message_id": "reply-0001",
         "correlation_id": "req-0001",
         "conversation_id": "orchlink-test",
         "task_id": "TEST-001",
-        "from_agent": "worker-backend",
-        "to_agent": "orchestrator",
+        "from_agent": "demo.work",
+        "to_agent": "demo.lead",
         "type": "PLAN",
         "status": "COMPLETED",
         "turn": 2,
@@ -65,7 +65,7 @@ def test_send_and_wait_completes_after_worker_reply():
             )
 
             next_response = await client.get(
-                "/v1/agents/worker-backend/next?wait_seconds=1",
+                "/v1/agents/demo.work/next?wait_seconds=1",
                 headers=HEADERS,
             )
             assert next_response.status_code == 200

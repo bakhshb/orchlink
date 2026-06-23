@@ -1,40 +1,19 @@
-import asyncio
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from orchlink.bridge.agent_runner import run_command
 from orchlink.connector.pi_extension import ensure_pi_extension
 from orchlink.project.config import broker_api_key, broker_url, project_root, role_agent_id, skill_path
 
 
 class PiConnectorError(RuntimeError):
-    """Raised when Orchlink cannot launch or use the configured Pi command."""
-
-
-@dataclass(frozen=True)
-class PiRunResult:
-    stdout: str
-    stderr: str
-    exit_code: int | None
-    timed_out: bool
-
-    @property
-    def succeeded(self) -> bool:
-        return self.exit_code == 0 and not self.timed_out
+    """Raised when Orchlink cannot launch the configured Pi command."""
 
 
 class PiConnector:
-    """Small adapter around the local Pi CLI.
-
-    The current Pi CLI supports named sessions and non-interactive prompt execution.
-    Orchlink uses that for the worker listener: each task is sent to the configured
-    worker session with `pi --print --session-id <id> <prompt>` and the captured
-    answer is returned to the broker.
-    """
+    """Small adapter around visible local Pi lead/work sessions."""
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -131,19 +110,6 @@ class PiConnector:
             *self._extension_args(),
         ]
 
-    def worker_argv(self, prompt: str) -> list[str]:
-        pi_config = self.config.get("pi") or {}
-        configured_args = pi_config.get("work_prompt_args")
-        if configured_args:
-            return [self.pi_command(), *[str(arg) for arg in configured_args], prompt]
-        return [
-            self.pi_command(),
-            "--print",
-            *self._session_args("work"),
-            *self._system_prompt_args("work"),
-            prompt,
-        ]
-
     def run_lead(self) -> int:
         if not self.check_available():
             raise PiConnectorError(f"Pi command not found: {self.pi_command()}")
@@ -153,53 +119,3 @@ class PiConnector:
         if not self.check_available():
             raise PiConnectorError(f"Pi command not found: {self.pi_command()}")
         return subprocess.call(self.work_interactive_argv(), cwd=self._role_project_dir("work"), env=self._env("work"))
-
-    async def run_worker_prompt(self, prompt: str, timeout_seconds: int) -> PiRunResult:
-        legacy_command = (self.config.get("work") or {}).get("command") or self.config.get("command")
-        if legacy_command:
-            result = await run_command(dict(legacy_command), prompt, timeout_seconds)
-            return PiRunResult(
-                stdout=result.stdout,
-                stderr=result.stderr,
-                exit_code=result.exit_code,
-                timed_out=result.timed_out,
-            )
-
-        if not self.check_available():
-            return PiRunResult(
-                stdout="",
-                stderr=(
-                    f"Pi command not found: {self.pi_command()}. "
-                    "Install Pi or set pi.command in .orch/project.yaml."
-                ),
-                exit_code=None,
-                timed_out=False,
-            )
-
-        process = await asyncio.create_subprocess_exec(
-            *self.worker_argv(prompt),
-            cwd=self._role_project_dir("work"),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                process.communicate(),
-                timeout=timeout_seconds,
-            )
-        except asyncio.TimeoutError:
-            process.kill()
-            stdout_bytes, stderr_bytes = await process.communicate()
-            return PiRunResult(
-                stdout=stdout_bytes.decode(errors="replace"),
-                stderr=stderr_bytes.decode(errors="replace"),
-                exit_code=None,
-                timed_out=True,
-            )
-
-        return PiRunResult(
-            stdout=stdout_bytes.decode(errors="replace"),
-            stderr=stderr_bytes.decode(errors="replace"),
-            exit_code=process.returncode,
-            timed_out=False,
-        )
