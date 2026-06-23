@@ -146,6 +146,22 @@ def create_app(
         recent_events = await message_store.list_events(since=since, limit=limit, project_id=project_id)
         return {"events": recent_events, "last_event_id": recent_events[-1]["id"] if recent_events else since}
 
+    @secure_router.post("/activity")
+    async def record_activity(
+        body: dict[str, Any] = Body(default_factory=dict),
+        message_store: MessageStore = Depends(get_store),
+    ) -> dict[str, Any]:
+        return await message_store.record_activity(body)
+
+    @secure_router.get("/activity")
+    async def activity(
+        item_id: str | None = Query(default=None),
+        limit: int = Query(default=20, ge=1, le=100),
+        project_id: str | None = Query(default=None),
+        message_store: MessageStore = Depends(get_store),
+    ) -> dict[str, Any]:
+        return {"activity": await message_store.list_activity(item_id=item_id, limit=limit, project_id=project_id)}
+
     @secure_router.get("/jobs")
     async def jobs(
         limit: int = Query(default=50, ge=1, le=500),

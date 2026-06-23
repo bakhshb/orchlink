@@ -311,6 +311,43 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     assert "Done." in wait_result.output
 
 
+def test_wait_prints_worker_activity_during_progress(monkeypatch, tmp_path):
+    init_project(tmp_path, project_id="demo")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
+    wait_calls = 0
+
+    def fake_broker_get_sync(config, path):
+        nonlocal wait_calls
+        if path.startswith("/v1/activity?"):
+            return {
+                "activity": [
+                    {
+                        "id": 1,
+                        "time": "2026-06-23T04:42:00+00:00",
+                        "activity_type": "tool_call",
+                        "tool_name": "bash",
+                        "detail": "rg users",
+                    }
+                ]
+            }
+        if path.startswith("/v1/tasks/T010/wait"):
+            wait_calls += 1
+            if wait_calls == 1:
+                return {"status": "WAIT_TIMEOUT", "task_id": "T010", "error": "still waiting"}
+            return {"status": "DONE", "task_id": "T010", "reply": {"type": "RESULT", "payload": {"summary": "Done."}}}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(cli_main, "broker_get_sync", fake_broker_get_sync)
+
+    result = runner.invoke(cli_main.app, ["wait", "T010", "--timeout-seconds", "3", "--poll-seconds", "1"])
+
+    assert result.exit_code == 0
+    assert "Worker activity" in result.output
+    assert "bash: rg users" in result.output
+    assert "Done." in result.output
+
+
 def test_get_failed_task_prints_stderr(monkeypatch, tmp_path):
     init_project(tmp_path, project_id="demo")
     monkeypatch.chdir(tmp_path)
@@ -361,6 +398,10 @@ def test_idle_blocks_when_worker_has_pending_jobs(monkeypatch, tmp_path):
                     "mode": "REVIEW",
                     "status": "DELIVERED",
                     "preview": "Review before full tests.",
+                    "last_activity_at": "2026-06-23T04:42:00+00:00",
+                    "last_activity_type": "tool_call",
+                    "last_activity_tool": "read",
+                    "last_activity_preview": "apps/api/app/api/users.py",
                 }
             ]
         },
@@ -371,7 +412,41 @@ def test_idle_blocks_when_worker_has_pending_jobs(monkeypatch, tmp_path):
     assert result.exit_code == 1
     assert "Worker is not idle" in result.output
     assert "R001" in result.output
+    assert "last activity" in result.output
+    assert "read:" in result.output
+    assert "apps/api/app/api/users.py" in result.output
     assert "Do not run dependent full tests" in result.output
+
+
+def test_peek_prints_worker_activity(monkeypatch, tmp_path):
+    init_project(tmp_path, project_id="demo")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_main, "ensure_broker_running", lambda config: None)
+
+    def fake_broker_get_sync(config, path):
+        assert path.startswith("/v1/activity?")
+        assert "item_id=T001" in path
+        return {
+            "activity": [
+                {
+                    "id": 1,
+                    "time": "2026-06-23T04:42:00+00:00",
+                    "task_id": "T001",
+                    "activity_type": "tool_call",
+                    "tool_name": "bash",
+                    "detail": "rg organization_id",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(cli_main, "broker_get_sync", fake_broker_get_sync)
+
+    result = runner.invoke(cli_main.app, ["peek", "T001"])
+
+    assert result.exit_code == 0
+    assert "Recent worker activity" in result.output
+    assert "tool_call" in result.output
+    assert "bash: rg organization_id" in result.output
 
 
 def test_task_command_reports_in_progress(monkeypatch, tmp_path):
@@ -401,6 +476,17 @@ def test_task_command_reports_in_progress(monkeypatch, tmp_path):
                     "task_id": "T001",
                     "type": "message_delivered",
                     "to_agent": "demo.work",
+                },
+                {
+                    "task_id": "T001",
+                    "type": "worker_activity",
+                    "payload": {
+                        "id": 1,
+                        "time": "2026-06-23T04:42:00+00:00",
+                        "activity_type": "tool_call",
+                        "tool_name": "read",
+                        "detail": "apps/api/app/api/users.py",
+                    },
                 }
             ]
         },
@@ -410,6 +496,9 @@ def test_task_command_reports_in_progress(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert "Task T001: IN_PROGRESS" in result.output
+    assert "Last worker activity" in result.output
+    assert "read:" in result.output
+    assert "apps/api/app/api/users.py" in result.output
     assert "Worker is still in progress" in result.output
 
 

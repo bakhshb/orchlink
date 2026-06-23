@@ -83,6 +83,37 @@ def test_enqueue_then_get_next_message():
     asyncio.run(run())
 
 
+def test_record_activity_marks_task_running_and_lists_activity():
+    async def run():
+        store = MemoryMessageStore()
+        await store.enqueue_message(task_message(project_id="demo", from_agent="demo.lead", to_agent="demo.work"))
+        await store.get_next_message("demo.work", wait_seconds=1)
+
+        recorded = await store.record_activity(
+            {
+                "project_id": "demo",
+                "agent_id": "demo.work",
+                "message_id": "msg-0001",
+                "task_id": "TEST-001",
+                "activity_type": "tool_call",
+                "tool_name": "read",
+                "detail": "apps/api/app/api/users.py",
+            }
+        )
+        task = await store.get_task_result("TEST-001", project_id="demo")
+        activity = await store.list_activity(item_id="TEST-001", project_id="demo")
+        events = await store.list_events(project_id="demo")
+
+        assert recorded == {"status": "recorded", "activity_id": 1}
+        assert task["status"] == "RUNNING"
+        assert task["job"]["last_activity_tool"] == "read"
+        assert task["job"]["last_activity_preview"] == "apps/api/app/api/users.py"
+        assert activity[-1]["activity_type"] == "tool_call"
+        assert events[-1]["type"] == "worker_activity"
+
+    asyncio.run(run())
+
+
 def test_project_scoped_jobs_allow_same_task_id_in_different_projects():
     async def run():
         store = MemoryMessageStore()

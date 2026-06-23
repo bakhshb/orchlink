@@ -247,9 +247,10 @@ You normally do not need these. The lead agent uses them when it coordinates wit
 | `orch close C001 -m "..."` | Close Talk Mode with a decision. |
 | `orch cancel T002 -m "..."` | Cancel stuck or no-longer-needed work. |
 | `orch jobs` | Show recent work. |
-| `orch idle` | Check whether work is busy. |
+| `orch idle` | Check whether work is busy; shows latest worker activity when available. |
+| `orch peek T002` | Show recent worker heartbeat/tool activity for a running task. |
 | `orch get T002` | Read a task result. |
-| `orch wait T002` | Wait for a task result. This does not cancel the task if the wait times out. |
+| `orch wait T002` | Wait for a task result and print worker activity while waiting. This does not cancel the task if the wait times out. |
 
 For big tasks, give work more time when sending the task:
 
@@ -261,7 +262,7 @@ Debug-only commands:
 
 | Command | Use |
 | --- | --- |
-| `orch watch` | Watch broker events. |
+| `orch watch` | Watch broker events, including worker activity heartbeats/tool calls. |
 | `orch work --no-pi` | Run the worker listener without opening Pi. |
 | `orch broker run --host 127.0.0.1 --port 8787` | Run the broker by hand. |
 

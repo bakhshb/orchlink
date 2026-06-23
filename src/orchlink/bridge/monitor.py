@@ -52,6 +52,12 @@ def format_event(event: dict[str, Any]) -> str:
     task_or_conversation = event.get("conversation_id") if message_type.startswith("CHAT_") else event.get("task_id")
     preview = event.get("preview") or ""
 
+    if event.get("type") == "worker_activity":
+        payload = event.get("payload") or {}
+        activity_type = str(payload.get("activity_type") or "activity")
+        task_or_conversation = event.get("task_id") or event.get("conversation_id") or "-"
+        return f"[{timestamp}] {from_agent} ACTIVITY {task_or_conversation} {activity_type}\n{preview}" if preview else f"[{timestamp}] {from_agent} ACTIVITY {task_or_conversation} {activity_type}"
+
     parts = [f"[{timestamp}]", from_agent]
     if to_agent != "-":
         parts.extend(["→", to_agent])

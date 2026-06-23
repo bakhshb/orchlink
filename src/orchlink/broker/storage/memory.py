@@ -22,7 +22,9 @@ class MemoryMessageStore(MessageStore):
         self._pending_replies: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self._task_waiters: dict[str, list[asyncio.Future[dict[str, Any]]]] = {}
         self._events: list[dict[str, Any]] = []
+        self._activity: list[dict[str, Any]] = []
         self._next_event_id = 1
+        self._next_activity_id = 1
         self._lock = asyncio.Lock()
 
     def _now(self) -> str:
@@ -61,7 +63,7 @@ class MemoryMessageStore(MessageStore):
     def _message_preview(self, message: dict[str, Any]) -> str:
         return self._payload_preview(message.get("payload") or {})
 
-    def _append_event_locked(self, event_type: str, **fields: Any) -> None:
+    def _append_event_locked(self, event_type: str, **fields: Any) -> dict[str, Any]:
         payload = fields.get("payload") or {}
         preview = fields.pop("preview", None)
         if preview is None and isinstance(payload, dict):
@@ -77,6 +79,7 @@ class MemoryMessageStore(MessageStore):
         self._events.append(event)
         if len(self._events) > 1000:
             self._events = self._events[-1000:]
+        return event
 
     def _expire_timed_out_messages_locked(self) -> None:
         now = datetime.now(timezone.utc)
@@ -154,6 +157,58 @@ class MemoryMessageStore(MessageStore):
             "payload": payload,
         }
 
+    def _activity_preview(self, activity: dict[str, Any]) -> str:
+        detail = str(activity.get("detail") or activity.get("phase") or activity.get("activity_type") or "")
+        tool_name = str(activity.get("tool_name") or "")
+        if tool_name and detail:
+            return f"{tool_name}: {detail}"
+        return tool_name or detail
+
+    def _apply_activity_to_work_locked(self, activity: dict[str, Any], timestamp: str) -> None:
+        project_id = str(activity.get("project_id") or "default")
+        task_id = str(activity.get("task_id") or "")
+        conversation_id = str(activity.get("conversation_id") or "")
+        message_id = str(activity.get("message_id") or "")
+        preview = str(activity.get("detail") or activity.get("phase") or activity.get("activity_type") or "")[:300]
+
+        target_message: dict[str, Any] | None = None
+        if message_id:
+            target_message = self._active_messages.get(message_id)
+        if target_message is None:
+            target_message = next(
+                (
+                    item
+                    for item in self._active_messages.values()
+                    if self._same_project(item, project_id)
+                    and (
+                        (task_id and str(item.get("task_id") or "") == task_id)
+                        or (conversation_id and str(item.get("conversation_id") or "") == conversation_id)
+                    )
+                ),
+                None,
+            )
+        if target_message and str(target_message.get("status") or "").upper() in BUSY_MESSAGE_STATUSES:
+            target_message["status"] = "RUNNING"
+            target_message["updated_at"] = timestamp
+            target_message["last_activity_at"] = timestamp
+            target_message["last_activity_type"] = activity.get("activity_type")
+            target_message["last_activity_tool"] = activity.get("tool_name")
+            target_message["last_activity_preview"] = preview
+            if target_message.get("task_id") and target_message.get("type") == "TASK":
+                self._upsert_task_locked(target_message, "RUNNING")
+
+        if task_id:
+            task_key = self._task_key(project_id, task_id)
+            task = self._tasks.get(task_key)
+            if task:
+                if str(task.get("status") or "").upper() in BUSY_MESSAGE_STATUSES:
+                    task["status"] = "RUNNING"
+                task["updated_at"] = timestamp
+                task["last_activity_at"] = timestamp
+                task["last_activity_type"] = activity.get("activity_type")
+                task["last_activity_tool"] = activity.get("tool_name")
+                task["last_activity_preview"] = preview
+
     def _upsert_task_locked(self, message: dict[str, Any], status: str) -> None:
         task_id = message.get("task_id")
         if not task_id:
@@ -179,6 +234,10 @@ class MemoryMessageStore(MessageStore):
             "message_id": existing.get("message_id") if is_reply else message.get("message_id"),
             "correlation_id": message.get("correlation_id") or existing.get("correlation_id"),
             "message_type": message.get("type"),
+            "last_activity_at": message.get("last_activity_at") or existing.get("last_activity_at"),
+            "last_activity_type": message.get("last_activity_type") or existing.get("last_activity_type"),
+            "last_activity_tool": message.get("last_activity_tool") or existing.get("last_activity_tool"),
+            "last_activity_preview": message.get("last_activity_preview") or existing.get("last_activity_preview"),
         }
 
     def _touch_conversation_locked(self, message: dict[str, Any], status: str | None = None) -> None:
@@ -449,6 +508,63 @@ class MemoryMessageStore(MessageStore):
                 **self._event_fields(message, status=normalized_status),
             )
             return {"status": normalized_status, "message_id": message_id}
+
+    async def record_activity(self, activity: dict[str, Any]) -> dict[str, Any]:
+        async with self._lock:
+            self._expire_timed_out_messages_locked()
+            timestamp = self._now()
+            stored = {
+                "id": self._next_activity_id,
+                "time": timestamp,
+                "project_id": str(activity.get("project_id") or "default"),
+                "task_id": activity.get("task_id"),
+                "conversation_id": activity.get("conversation_id"),
+                "message_id": activity.get("message_id"),
+                "agent_id": activity.get("agent_id"),
+                "activity_type": str(activity.get("activity_type") or "activity"),
+                "phase": activity.get("phase"),
+                "tool_name": activity.get("tool_name"),
+                "detail": str(activity.get("detail") or "")[:500],
+                "status": str(activity.get("status") or "RUNNING"),
+                "mode": activity.get("mode"),
+            }
+            self._next_activity_id += 1
+            self._activity.append(stored)
+            if len(self._activity) > 1000:
+                self._activity = self._activity[-1000:]
+            self._apply_activity_to_work_locked(stored, timestamp)
+            self._append_event_locked(
+                "worker_activity",
+                project_id=stored.get("project_id"),
+                task_id=stored.get("task_id"),
+                conversation_id=stored.get("conversation_id"),
+                message_id=stored.get("message_id"),
+                from_agent=stored.get("agent_id"),
+                message_type="ACTIVITY",
+                mode=stored.get("mode"),
+                status=stored.get("status"),
+                payload=stored,
+                preview=self._activity_preview(stored),
+            )
+            return {"status": "recorded", "activity_id": stored["id"]}
+
+    async def list_activity(
+        self,
+        item_id: str | None = None,
+        limit: int = 20,
+        project_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        async with self._lock:
+            selected = [dict(item) for item in self._activity if self._same_project(item, project_id)]
+            if item_id:
+                selected = [
+                    item
+                    for item in selected
+                    if str(item.get("task_id") or "") == item_id
+                    or str(item.get("conversation_id") or "") == item_id
+                    or str(item.get("message_id") or "") == item_id
+                ]
+            return selected[-limit:]
 
     async def cancel_work(self, item_id: str, reason: str = "", project_id: str | None = None) -> dict[str, Any]:
         cancelled: list[str] = []

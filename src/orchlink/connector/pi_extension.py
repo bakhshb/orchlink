@@ -241,6 +241,21 @@ async function markMessageStatus(messageId: string, status: string): Promise<voi
   await postJson(`/v1/messages/${encodeURIComponent(messageId)}/status`, { status });
 }
 
+function truncate(value: any, maxLength = 180): string {
+  const text = String(value === undefined || value === null ? "" : value).replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function summarizeToolInput(toolName: string, input: any): string {
+  if (!input || typeof input !== "object") return "";
+  if (toolName === "bash") return truncate(input.command || "bash", 220);
+  if (toolName === "read") return truncate(input.path || "read", 220);
+  if (toolName === "edit" || toolName === "write") return truncate(input.path || toolName, 220);
+  if (toolName === "web_fetch") return truncate(input.url || "web_fetch", 220);
+  if (toolName === "web_search") return truncate(input.query || "web_search", 220);
+  return truncate(JSON.stringify(input), 220);
+}
+
 export default function (pi: ExtensionAPI) {
   const role = env("ORCHLINK_PI_ROLE");
   const agentId = env("ORCHLINK_AGENT_ID");
@@ -250,10 +265,13 @@ export default function (pi: ExtensionAPI) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancelTimer: ReturnType<typeof setTimeout> | undefined;
   let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  let activityTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingTask: OrchMessage | undefined;
   let currentTask: OrchMessage | undefined;
   let cancelNoticeSent = false;
+  let activityUnsupported = false;
   const recoveryGraceMs = Math.max(1000, Number(env("ORCHLINK_RECOVERABLE_ERROR_GRACE_MS", "180000")) || 180000);
+  const activityHeartbeatMs = Math.max(5000, Number(env("ORCHLINK_ACTIVITY_HEARTBEAT_MS", "15000")) || 15000);
 
   async function register() {
     if (!agentId || !role) return;
@@ -280,6 +298,45 @@ export default function (pi: ExtensionAPI) {
   function clearRecoveryTimer() {
     if (recoveryTimer) clearTimeout(recoveryTimer);
     recoveryTimer = undefined;
+  }
+
+  function clearActivityHeartbeat() {
+    if (activityTimer) clearTimeout(activityTimer);
+    activityTimer = undefined;
+  }
+
+  async function postCurrentActivity(activityType: string, detail: string, extra: OrchMessage = {}) {
+    if (activityUnsupported || role !== "work" || !currentTask) return;
+    const payload = currentTask.payload || {};
+    try {
+      await postJson("/v1/activity", {
+        project_id: currentTask.project_id || projectId,
+        agent_id: agentId,
+        task_id: currentTask.task_id || null,
+        conversation_id: currentTask.conversation_id || null,
+        message_id: currentTask.message_id || null,
+        mode: isChatRequest(currentTask) ? "TALK" : payload.mode,
+        activity_type: activityType,
+        phase: extra.phase || activityType,
+        tool_name: extra.tool_name || null,
+        detail,
+        status: "RUNNING",
+      });
+    } catch (error: any) {
+      if (String(error?.message || error).startsWith("404")) activityUnsupported = true;
+      console.error(`[orchlink] activity update failed: ${error?.message || error}`);
+    }
+  }
+
+  function scheduleActivityHeartbeat(delayMs = activityHeartbeatMs) {
+    clearActivityHeartbeat();
+    if (stopped || role !== "work" || !currentTask) return;
+    activityTimer = setTimeout(() => {
+      void postCurrentActivity("heartbeat", "Worker still active.", { phase: "working" })
+        .finally(() => {
+          if (currentTask) scheduleActivityHeartbeat(activityHeartbeatMs);
+        });
+    }, delayMs);
   }
 
   function isRecoverableAssistantError(assistantMessage: any): boolean {
@@ -309,6 +366,7 @@ export default function (pi: ExtensionAPI) {
       if (!currentTask || currentTask.message_id !== task.message_id) return;
       currentTask = undefined;
       clearCancelCheck();
+      clearActivityHeartbeat();
       void sendReply(task, assistantMessage, ctx);
     }, recoveryGraceMs);
   }
@@ -403,7 +461,28 @@ export default function (pi: ExtensionAPI) {
     void markMessageStatus(String(currentTask.message_id || ""), "RUNNING").catch((error) => {
       console.error(`[orchlink] status update failed: ${error?.message || error}`);
     });
+    void postCurrentActivity("started", "Worker accepted the task.", { phase: "started" });
+    scheduleActivityHeartbeat(1000);
     scheduleCancelCheck(5000);
+  });
+
+  pi.on("tool_call", async (event) => {
+    if (role !== "work" || !currentTask) return;
+    const toolName = String((event as any).toolName || "tool");
+    void postCurrentActivity("tool_call", summarizeToolInput(toolName, (event as any).input), {
+      phase: "tool_call",
+      tool_name: toolName,
+    });
+  });
+
+  pi.on("tool_result", async (event) => {
+    if (role !== "work" || !currentTask) return;
+    const toolName = String((event as any).toolName || "tool");
+    const failed = Boolean((event as any).isError);
+    void postCurrentActivity("tool_result", failed ? "Tool finished with error." : "Tool finished.", {
+      phase: failed ? "tool_error" : "tool_result",
+      tool_name: toolName,
+    });
   });
 
   pi.on("message_end", async (event, ctx) => {
@@ -413,6 +492,7 @@ export default function (pi: ExtensionAPI) {
 
     const task = currentTask;
     if (isRecoverableAssistantError(event.message)) {
+      void postCurrentActivity("recovering", "Provider transport error; waiting for Pi recovery.", { phase: "recovering" });
       deferRecoverableFailure(task, event.message, ctx);
       return;
     }
@@ -420,6 +500,7 @@ export default function (pi: ExtensionAPI) {
     clearRecoveryTimer();
     currentTask = undefined;
     clearCancelCheck();
+    clearActivityHeartbeat();
     await sendReply(task, event.message, ctx);
   });
 
@@ -428,6 +509,7 @@ export default function (pi: ExtensionAPI) {
     if (timer) clearTimeout(timer);
     clearCancelCheck();
     clearRecoveryTimer();
+    clearActivityHeartbeat();
   });
 }
 '''

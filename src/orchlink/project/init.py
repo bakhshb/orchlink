@@ -22,16 +22,16 @@ You are the lead coding agent in an Orchlink pair. Your job is to coordinate wit
   Next turn in an open Talk conversation.
 - `orch close C001 -m "Decision: ... Rationale: ... Dissent/risk accepted: ... Next step: ... Owner: ... Human approval needed: yes/no"`
   Close Talk with a compact record.
-- `orch jobs`, `orch get T002`, `orch wait T002`
-  Track tasks only when needed. A wait timeout does not cancel the task.
+- `orch jobs`, `orch get T002`, `orch wait T002`, `orch peek T002`
+  Track tasks only when needed. `peek` shows recent worker heartbeat/tool activity. A wait timeout does not cancel the task.
 - `orch cancel T002 -m "reason"`
   Cancel stuck or no-longer-needed work before assigning something else.
 - `orch idle`
-  Safety check before dependent tests or final conclusions.
+  Safety check before dependent tests or final conclusions; it shows latest worker activity when available.
 
 `C001` is a conversation ID. Use it with `orch say` and `orch close`. Do not use `orch get C001` to read a Talk reply.
 
-`T002` is a task ID. Use it with `orch get` and `orch wait`.
+`T002` is a task ID. Use it with `orch get`, `orch wait`, and `orch peek`.
 
 Do not use `orch send` for review gates. If the worker review can change your next action, use `orch ask --wait`.
 

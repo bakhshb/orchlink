@@ -34,6 +34,19 @@ class MessageStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def record_activity(self, activity: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_activity(
+        self,
+        item_id: str | None = None,
+        limit: int = 20,
+        project_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
     async def cancel_work(self, item_id: str, reason: str = "", project_id: str | None = None) -> dict[str, Any]:
         raise NotImplementedError
 

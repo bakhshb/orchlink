@@ -75,9 +75,23 @@ def test_format_event_includes_chat_and_task_context():
         }
     )
 
+    activity = format_event(
+        {
+            "time": "2026-06-20T10:21:01+00:00",
+            "type": "worker_activity",
+            "from_agent": "demo.work",
+            "message_type": "ACTIVITY",
+            "task_id": "T002",
+            "preview": "bash: rg organization_id",
+            "payload": {"activity_type": "tool_call"},
+        }
+    )
+
     assert "lead → work CHAT_START C001" in chat
     assert "Should we add SQLite" in chat
     assert "lead → work TASK T002 PLAN ASYNC" in task
+    assert "work ACTIVITY T002 tool_call" in activity
+    assert "bash: rg organization_id" in activity
 
 
 def test_events_endpoint_shows_request_reply_flow():

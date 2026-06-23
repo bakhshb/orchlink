@@ -5,6 +5,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 from typing import Annotated, Any
@@ -177,6 +178,68 @@ def current_project_id(config: dict[str, Any]) -> str:
 def project_query(config: dict[str, Any], prefix: str = "?") -> str:
     project_id = quote(current_project_id(config), safe="")
     return f"{prefix}project_id={project_id}"
+
+
+def activity_query(config: dict[str, Any], item_id: str | None = None, limit: int = 10) -> str:
+    path = f"/v1/activity?limit={limit}{project_query(config, '&')}"
+    if item_id:
+        path += f"&item_id={quote(item_id, safe='')}"
+    return path
+
+
+def parse_iso_time(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def human_age(value: Any) -> str:
+    parsed = parse_iso_time(value)
+    if parsed is None:
+        return "unknown age"
+    seconds = max(0, int((datetime.now(timezone.utc) - parsed).total_seconds()))
+    if seconds < 60:
+        return f"{seconds}s ago"
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds}s ago"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m ago"
+
+
+def activity_preview(activity: dict[str, Any]) -> str:
+    tool = str(activity.get("tool_name") or "")
+    detail = str(activity.get("detail") or activity.get("phase") or activity.get("activity_type") or "").strip()
+    if tool and detail:
+        return f"{tool}: {detail}"
+    return tool or detail
+
+
+def format_activity(activity: dict[str, Any]) -> str:
+    timestamp = str(activity.get("time") or "")
+    stamp = timestamp[11:19] if len(timestamp) >= 19 else timestamp
+    age = human_age(timestamp)
+    kind = str(activity.get("activity_type") or "activity")
+    preview = activity_preview(activity)
+    return f"[{stamp}] {kind} ({age}) {preview}".rstrip()
+
+
+def job_activity_line(job: dict[str, Any]) -> str:
+    if not job.get("last_activity_at"):
+        return ""
+    activity = {
+        "time": job.get("last_activity_at"),
+        "activity_type": job.get("last_activity_type"),
+        "tool_name": job.get("last_activity_tool"),
+        "detail": job.get("last_activity_preview"),
+    }
+    return format_activity(activity)
 
 
 def next_conversation_id(config: dict[str, Any]) -> str:
@@ -566,6 +629,9 @@ def task(task_id: str) -> None:
     status_text = str(latest_message.get("status") or "UNKNOWN")
     console.print(f"[Orch] Task {task_id}: {status_text}")
     console.print(f"[Orch] Route: {latest_message.get('from_agent', '-')} → {latest_message.get('to_agent', '-')}")
+    activity_events = [item for item in events if item.get("type") == "worker_activity"]
+    if activity_events:
+        console.print(f"[Orch] Last worker activity: {format_activity(activity_events[-1].get('payload') or activity_events[-1])}")
 
     reply_events = [item for item in events if item.get("type") == "reply_received"]
     if reply_events:
@@ -610,6 +676,9 @@ def _print_task_body(body: dict[str, Any]) -> None:
     elif body.get("job"):
         job = body["job"]
         console.print(f"[Orch] Route: {job.get('from_agent', '-')} → {job.get('to_agent', '-')}")
+        activity = job_activity_line(job)
+        if activity:
+            console.print(f"[Orch] Last worker activity: {activity}")
         preview = str(job.get("preview") or "").strip()
         if preview:
             console.print(preview)
@@ -778,8 +847,35 @@ def idle(limit: Annotated[int, typer.Option("--limit")] = 50) -> None:
         job_id = job.get("task_id") or job.get("conversation_id") or "-"
         preview = str(job.get("preview") or job.get("last_message_preview") or "")
         console.print(f"- {job_id} {job.get('kind', '-')} {job.get('mode', '-')} {job.get('status', '-')}: {preview}")
+        activity = job_activity_line(job)
+        if activity:
+            console.print(f"  last activity: {activity}")
     console.print("[Orch] Do not run dependent full tests or final conclusions yet.")
     raise typer.Exit(1)
+
+
+@app.command()
+def peek(
+    item_id: str,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
+) -> None:
+    config = load_project_or_exit()
+    try:
+        ensure_broker_running(config)
+        body = broker_get_sync(config, activity_query(config, item_id=item_id, limit=limit))
+    except (RuntimeError, httpx.HTTPError) as exc:
+        console.print(f"[Orch] {exc}")
+        raise typer.Exit(1) from exc
+
+    activity = body.get("activity") or []
+    if not activity:
+        console.print(f"[Orch] No worker activity recorded for {item_id}.")
+        console.print("[Orch] If the task is pending, the worker may not have picked it up yet or the broker/session is stale.")
+        return
+
+    console.print(f"[Orch] Recent worker activity for {item_id}:")
+    for item in activity:
+        console.print(f"- {format_activity(item)}")
 
 
 @app.command("get")
@@ -803,15 +899,45 @@ def get_command(item_id: str) -> None:
 def wait_command(
     task_id: str,
     timeout_seconds: Annotated[int, typer.Option("--timeout-seconds")] = 1800,
+    progress: Annotated[bool, typer.Option("--progress/--no-progress", help="Print worker activity while waiting.")] = True,
+    poll_seconds: Annotated[int, typer.Option("--poll-seconds", min=1, max=60)] = 5,
 ) -> None:
     config = load_project_or_exit()
     try:
         ensure_broker_running(config)
-        body = broker_get_sync(config, f"/v1/tasks/{task_id}/wait?timeout_seconds={timeout_seconds}{project_query(config, '&')}")
-    except (RuntimeError, httpx.HTTPError) as exc:
+    except RuntimeError as exc:
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
-    _print_task_body(body)
+
+    deadline = time.monotonic() + timeout_seconds
+    last_activity_id = 0
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _print_task_body({"status": "WAIT_TIMEOUT", "task_id": task_id, "error": "No task result arrived before the wait timeout."})
+            return
+        wait_seconds = timeout_seconds if not progress else max(1, min(poll_seconds, int(remaining)))
+        try:
+            body = broker_get_sync(config, f"/v1/tasks/{task_id}/wait?timeout_seconds={wait_seconds}{project_query(config, '&')}")
+        except httpx.HTTPError as exc:
+            console.print(f"[Orch] {exc}")
+            raise typer.Exit(1) from exc
+        if body.get("status") != "WAIT_TIMEOUT":
+            _print_task_body(body)
+            return
+        if not progress:
+            _print_task_body(body)
+            return
+        try:
+            activity_body = broker_get_sync(config, activity_query(config, item_id=task_id, limit=5))
+        except httpx.HTTPError:
+            activity_body = {"activity": []}
+        for activity in activity_body.get("activity", []):
+            activity_id = int(activity.get("id") or 0)
+            if activity_id <= last_activity_id:
+                continue
+            console.print(f"[Orch] Worker activity: {format_activity(activity)}")
+            last_activity_id = activity_id
 
 
 @app.command()

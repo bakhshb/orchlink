@@ -173,6 +173,51 @@ def test_jobs_and_tasks_filter_by_project_id():
     assert task_response.json()["job"]["from_agent"] == "p2.lead"
 
 
+def test_activity_endpoint_marks_task_running_and_lists_activity():
+    client = make_client()
+    message = {
+        "protocol": "orch-a2a-v1",
+        "message_id": "msg-activity",
+        "correlation_id": "req-activity",
+        "project_id": "demo",
+        "conversation_id": "demo-tasks",
+        "task_id": "T123",
+        "from_agent": "demo.lead",
+        "to_agent": "demo.work",
+        "type": "TASK",
+        "status": "PENDING",
+        "turn": 1,
+        "max_turns": 6,
+        "requires_reply": True,
+        "timeout_seconds": 1800,
+        "delivery": "async",
+        "payload": {"mode": "REVIEW", "intent": "Review."},
+    }
+    client.post("/v1/messages/send", headers=auth_headers(), json=message)
+    client.get("/v1/agents/demo.work/next?wait_seconds=1", headers=auth_headers())
+
+    response = client.post(
+        "/v1/activity",
+        headers=auth_headers(),
+        json={
+            "project_id": "demo",
+            "agent_id": "demo.work",
+            "message_id": "msg-activity",
+            "task_id": "T123",
+            "activity_type": "tool_call",
+            "tool_name": "bash",
+            "detail": "rg organization_id",
+        },
+    )
+    task_response = client.get("/v1/tasks/T123?project_id=demo", headers=auth_headers())
+    activity_response = client.get("/v1/activity?item_id=T123&project_id=demo", headers=auth_headers())
+
+    assert response.json() == {"status": "recorded", "activity_id": 1}
+    assert task_response.json()["status"] == "RUNNING"
+    assert task_response.json()["job"]["last_activity_tool"] == "bash"
+    assert activity_response.json()["activity"][0]["detail"] == "rg organization_id"
+
+
 def test_get_and_wait_task_result():
     client = make_client()
     message = {

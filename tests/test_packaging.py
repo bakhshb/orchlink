@@ -34,6 +34,7 @@ def test_cli_imports_from_installable_package_and_exposes_required_commands():
     assert "cancel" in result.output
     assert "jobs" in result.output
     assert "idle" in result.output
+    assert "peek" in result.output
     assert "monitor" in result.output
     assert "status" in result.output
     assert "doctor" in result.output
@@ -63,6 +64,10 @@ def test_pi_extension_uses_valid_record_type():
     assert "180000" in ORCHLINK_PI_EXTENSION
     assert "WebSocket error|provider_transport_failure|transport" in ORCHLINK_PI_EXTENSION
     assert "waiting for Pi recovery" in ORCHLINK_PI_EXTENSION
+    assert "ORCHLINK_ACTIVITY_HEARTBEAT_MS" in ORCHLINK_PI_EXTENSION
+    assert "postCurrentActivity" in ORCHLINK_PI_EXTENSION
+    assert "pi.on(\"tool_call\"" in ORCHLINK_PI_EXTENSION
+    assert "pi.on(\"tool_result\"" in ORCHLINK_PI_EXTENSION
     assert "Next: if worker asked a direct question" in ORCHLINK_PI_EXTENSION
     assert "-m \"<your answer>\"" in ORCHLINK_PI_EXTENSION
     assert "Talk Mode should stop only when" not in ORCHLINK_PI_EXTENSION
@@ -75,12 +80,15 @@ def test_pi_extension_keeps_current_task_during_recoverable_transport_error():
     from orchlink.connector.pi_extension import ORCHLINK_PI_EXTENSION
 
     assert """if (isRecoverableAssistantError(event.message)) {
+      void postCurrentActivity("recovering", "Provider transport error; waiting for Pi recovery.", { phase: "recovering" });
       deferRecoverableFailure(task, event.message, ctx);
       return;
     }
 
     clearRecoveryTimer();
-    currentTask = undefined;""" in ORCHLINK_PI_EXTENSION
+    currentTask = undefined;
+    clearCancelCheck();
+    clearActivityHeartbeat();""" in ORCHLINK_PI_EXTENSION
 
 
 def test_broker_run_command_is_registered_without_starting_server(monkeypatch):
