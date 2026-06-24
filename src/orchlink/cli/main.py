@@ -859,7 +859,7 @@ def get_command(item_id: str) -> None:
 @app.command("wait")
 def wait_command(
     task_id: str,
-    timeout_seconds: Annotated[int, typer.Option("--timeout-seconds")] = 1800,
+    timeout_seconds: Annotated[int, typer.Option("--timeout-seconds", "--timeout")] = 1800,
     progress: Annotated[bool, typer.Option("--progress/--no-progress", help="Print worker activity while waiting.")] = True,
     poll_seconds: Annotated[int, typer.Option("--poll-seconds", min=1, max=60)] = 5,
 ) -> None:

@@ -304,6 +304,7 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     jobs_result = runner.invoke(cli_main.app, ["jobs"])
     get_result = runner.invoke(cli_main.app, ["get", "T010"])
     wait_result = runner.invoke(cli_main.app, ["wait", "T010", "--timeout-seconds", "1"])
+    wait_alias_result = runner.invoke(cli_main.app, ["wait", "T010", "--timeout", "1"])
 
     assert jobs_result.exit_code == 0
     assert "ID" in jobs_result.output
@@ -314,6 +315,8 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     assert "Done." in get_result.output
     assert wait_result.exit_code == 0
     assert "Done." in wait_result.output
+    assert wait_alias_result.exit_code == 0
+    assert "Done." in wait_alias_result.output
 
 
 def test_wait_prints_worker_activity_during_progress(monkeypatch, tmp_path):
