@@ -24,6 +24,7 @@ def test_init_project_creates_project_config_and_skills(tmp_path):
     assert data["project_id"] == "demo"
     assert data["lead"]["agent_id"] == "demo.lead"
     assert data["work"]["agent_id"] == "demo.work"
+    assert "timeout_seconds" not in data["work"]
     assert data["broker"]["auto_start"] is True
     lead_skill = paths["lead_skill"].read_text(encoding="utf-8")
     work_skill = paths["work_skill"].read_text(encoding="utf-8")

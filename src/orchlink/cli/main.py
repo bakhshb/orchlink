@@ -508,7 +508,7 @@ def ask(
     worker_id: str,
     task_id: Annotated[str, typer.Option("--task", "--task-id", "-t")],
     message: Annotated[str, typer.Option("--msg", "--message", "-m")],
-    timeout_seconds: Annotated[int, typer.Option("--timeout")] = 1800,
+    timeout: Annotated[int, typer.Option("--timeout")] = 1800,
     wait: Annotated[bool, typer.Option("--wait/--no-wait", help="Wait in this shell for the reply. Use orch send for async tasks.")] = True,
 ) -> None:
     config = load_project_or_exit()
@@ -519,7 +519,7 @@ def ask(
             worker=worker_id,
             task_id=task_id,
             message=message,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=timeout,
             wait=wait,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
@@ -535,7 +535,7 @@ def send(
     worker_id: str,
     task_id: Annotated[str, typer.Option("--task", "--task-id", "-t")],
     message: Annotated[str, typer.Option("--msg", "--message", "-m")],
-    timeout_seconds: Annotated[int, typer.Option("--timeout")] = 1800,
+    timeout: Annotated[int, typer.Option("--timeout")] = 1800,
     allow_async_review: Annotated[bool, typer.Option("--allow-async-review", help="Allow REVIEW through async send. Use only when review is not a gate.")] = False,
 ) -> None:
     mode = infer_task_mode(message)
@@ -553,7 +553,7 @@ def send(
             worker=worker_id,
             task_id=task_id,
             message=message,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=timeout,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
         print_orch_exception(exc)
@@ -665,7 +665,7 @@ def talk(
     worker_id: str,
     message: Annotated[str, typer.Option("--msg", "--message", "-m")],
     rounds: Annotated[int, typer.Option("--rounds", "-r", min=1, max=6, help="Number of lead↔worker back-and-forth rounds.")] = 6,
-    timeout_seconds: Annotated[int, typer.Option("--timeout")] = 1800,
+    timeout: Annotated[int, typer.Option("--timeout")] = 1800,
 ) -> None:
     require_nonempty_talk_message(message, "Talk")
     config = load_project_or_exit()
@@ -679,7 +679,7 @@ def talk(
             conversation_id=conversation_id,
             message=message,
             max_turns=max_turns,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=timeout,
             wait=False,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
@@ -696,7 +696,7 @@ def talk(
 def say(
     conversation_id: str,
     message: Annotated[str, typer.Option("--msg", "--message", "-m")],
-    timeout_seconds: Annotated[int, typer.Option("--timeout")] = 1800,
+    timeout: Annotated[int, typer.Option("--timeout")] = 1800,
 ) -> None:
     require_nonempty_talk_message(message, "Say")
     config = load_project_or_exit()
@@ -721,7 +721,7 @@ def say(
             message=message,
             turn=turn,
             max_turns=max_turns,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=timeout,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
         print_orch_exception(exc)
@@ -735,7 +735,7 @@ def say(
 def close(
     conversation_id: str,
     message: Annotated[str, typer.Option("--msg", "--message", "-m")] = "",
-    timeout_seconds: Annotated[int, typer.Option("--timeout")] = 1800,
+    timeout: Annotated[int, typer.Option("--timeout")] = 1800,
 ) -> None:
     config = load_project_or_exit()
     try:
@@ -753,7 +753,7 @@ def close(
             message=message,
             turn=turn,
             max_turns=max_turns,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=timeout,
         )
     except (RuntimeError, httpx.HTTPError) as exc:
         print_orch_exception(exc)
@@ -859,7 +859,7 @@ def get_command(item_id: str) -> None:
 @app.command("wait")
 def wait_command(
     task_id: str,
-    timeout_seconds: Annotated[int, typer.Option("--timeout")] = 1800,
+    timeout: Annotated[int, typer.Option("--timeout")] = 1800,
     progress: Annotated[bool, typer.Option("--progress/--no-progress", help="Print worker activity while waiting.")] = True,
     poll_seconds: Annotated[int, typer.Option("--poll-seconds", min=1, max=60)] = 5,
 ) -> None:
@@ -870,14 +870,14 @@ def wait_command(
         console.print(f"[Orch] {exc}")
         raise typer.Exit(1) from exc
 
-    deadline = time.monotonic() + timeout_seconds
+    deadline = time.monotonic() + timeout
     last_activity_id = 0
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             _print_task_body({"status": "WAIT_TIMEOUT", "task_id": task_id, "error": "No task result arrived before the wait timeout."})
             return
-        wait_seconds = timeout_seconds if not progress else max(1, min(poll_seconds, int(remaining)))
+        wait_seconds = timeout if not progress else max(1, min(poll_seconds, int(remaining)))
         try:
             body = broker_get_sync(config, f"/v1/tasks/{task_id}/wait?timeout_seconds={wait_seconds}{project_query(config, '&')}")
         except httpx.HTTPError as exc:

@@ -191,7 +191,6 @@ def default_project_config(project_dir: Path, project_id: str | None = None) -> 
             "session_id": "work",
             "project_dir": ".",
             "poll_wait_seconds": 5,
-            "timeout_seconds": 1800,
         },
         "scope": {
             "allowed": ["**/*"],

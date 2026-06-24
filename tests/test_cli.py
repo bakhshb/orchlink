@@ -316,11 +316,11 @@ def test_jobs_get_and_wait_commands(monkeypatch, tmp_path):
     assert "Done." in wait_result.output
 
 
-def test_wait_rejects_timeout_seconds_flag():
-    result = runner.invoke(cli_main.app, ["wait", "T010", "--timeout-seconds", "1"])
+def test_wait_help_shows_timeout_flag_only():
+    result = runner.invoke(cli_main.app, ["wait", "--help"])
 
-    assert result.exit_code == 2
-    assert "No such option '--timeout-seconds'" in result.output
+    assert result.exit_code == 0
+    assert result.output.count("--timeout") == 1
 
 
 def test_wait_prints_worker_activity_during_progress(monkeypatch, tmp_path):

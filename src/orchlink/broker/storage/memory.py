@@ -107,7 +107,7 @@ class MemoryMessageStore(MessageStore):
                     "status": "TIMEOUT",
                     "project_id": self._project_id(message),
                     "task_id": str(task_id),
-                    "error": "Task exceeded its timeout_seconds before the worker replied.",
+                    "error": "Task exceeded its timeout before the worker replied.",
                     "job": dict(message),
                 }
                 task_key = self._task_key(self._project_id(message), str(task_id))
@@ -123,12 +123,12 @@ class MemoryMessageStore(MessageStore):
                     "type": "BLOCKER",
                     "status": "TIMEOUT",
                     "correlation_id": message.get("correlation_id"),
-                    "payload": {"summary": "Worker did not reply before timeout_seconds."},
+                    "payload": {"summary": "Worker did not reply before the timeout."},
                 })
             self._append_event_locked(
                 "timeout",
                 **self._event_fields(message, status="TIMEOUT"),
-                preview="Work exceeded timeout_seconds before the worker replied.",
+                preview="Work exceeded the timeout before the worker replied.",
             )
 
     def _job_mode(self, message: dict[str, Any]) -> str:
