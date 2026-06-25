@@ -43,10 +43,10 @@ def test_pi_extension_uses_valid_record_type():
 
     assert "type OrchMessage = Record<string, any>;" in ORCHLINK_PI_EXTENSION
     assert "type OrchMessage = Record;" not in ORCHLINK_PI_EXTENSION
-    assert "TYPE: CHAT_REPLY" in ORCHLINK_PI_EXTENSION
+    assert "TYPE: CHAT_REPLY" not in ORCHLINK_PI_EXTENSION
+    assert "MODE: TALK" not in ORCHLINK_PI_EXTENSION
+    assert "No template and no required labels" in ORCHLINK_PI_EXTENSION
     assert "do not read every file" in ORCHLINK_PI_EXTENSION
-    assert "no new value" in ORCHLINK_PI_EXTENSION
-    assert "No big paragraph" in ORCHLINK_PI_EXTENSION
     assert "too broad" in ORCHLINK_PI_EXTENSION
     assert "stripChatReplyMarker" in ORCHLINK_PI_EXTENSION
     assert "pendingTask" in ORCHLINK_PI_EXTENSION
@@ -68,8 +68,11 @@ def test_pi_extension_uses_valid_record_type():
     assert "postCurrentActivity" in ORCHLINK_PI_EXTENSION
     assert "pi.on(\"tool_call\"" in ORCHLINK_PI_EXTENSION
     assert "pi.on(\"tool_result\"" in ORCHLINK_PI_EXTENSION
-    assert "Next: if worker asked a direct question" in ORCHLINK_PI_EXTENSION
-    assert "-m \"<your answer>\"" in ORCHLINK_PI_EXTENSION
+    assert "[Orchlink] ${message.from_agent" in ORCHLINK_PI_EXTENSION
+    assert "Next: if worker asked a direct question" not in ORCHLINK_PI_EXTENSION
+    assert "Worker says:" not in ORCHLINK_PI_EXTENSION
+    assert "Conversation:" not in ORCHLINK_PI_EXTENSION
+    assert "-m \"<your answer>\"" not in ORCHLINK_PI_EXTENSION
     assert "Talk Mode should stop only when" not in ORCHLINK_PI_EXTENSION
     assert "renderLeadPrompt(message), { deliverAs: \"steer\" }" in ORCHLINK_PI_EXTENSION
     assert "deliverAs: \"nextTurn\"" not in ORCHLINK_PI_EXTENSION

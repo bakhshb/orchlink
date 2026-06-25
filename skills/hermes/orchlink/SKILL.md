@@ -115,7 +115,7 @@ orch say C001 -m "answer or follow-up"
 orch close C001 -m "Decision: ... Rationale: ... Dissent/risk accepted: ... Next step: ... Owner: ... Human approval needed: yes/no"
 ```
 
-Talk Mode messages should be short and conversational: no `MODE`, no `TASK_ID`, no task boilerplate.
+Talk Mode messages should be short and conversational: no required template, no `MODE`, no `TASK_ID`, no task boilerplate.
 
 ## Review gates
 

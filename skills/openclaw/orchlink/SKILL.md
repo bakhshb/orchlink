@@ -146,7 +146,7 @@ orch say C001 -m "answer or follow-up"
 orch close C001 -m "Decision: ... Rationale: ... Dissent/risk accepted: ... Next step: ... Owner: ... Human approval needed: yes/no"
 ```
 
-Talk Mode is a conversation, not a task order. No `TASK_ID`, no `MODE`, no scope boilerplate.
+Talk Mode is a conversation, not a task order. No required template, no `TASK_ID`, no `MODE`, no scope boilerplate.
 
 ## Worker result expectations
 

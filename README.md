@@ -141,7 +141,7 @@ Example in normal words:
 Should we add SQLite now or later? Ask work to challenge the decision.
 ```
 
-Lead will start the talk, read the worker reply, ask a follow-up if needed, then close the conversation when there is a decision.
+Lead will start the talk, read the worker reply, ask a follow-up if needed, then close the conversation when there is a decision. Talk replies are plain teammate chat, not a required template.
 
 Talk Mode stops when there is:
 

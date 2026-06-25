@@ -24,13 +24,7 @@ DEFAULT_EXPECTED_REPLY = [
     "recommended next step",
 ]
 
-TALK_EXPECTED_REPLY = [
-    "position",
-    "reasoning",
-    "risks",
-    "counterpoint",
-    "recommendation",
-]
+TALK_EXPECTED_REPLY: list[str] = []
 
 VALID_TASK_MODES = {"DISCUSS", "PLAN", "DO", "REVIEW"}
 

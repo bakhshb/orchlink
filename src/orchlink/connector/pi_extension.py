@@ -49,19 +49,15 @@ Transcript preview:
 ${payload.transcript_preview || ""}
 
 Guidance:
-- Put TYPE: CHAT_REPLY first, then answer conversationally in 2-4 short lines. No big paragraph.
+- Reply naturally, like a teammate in chat. No template and no required labels.
 - Answer the lead's latest question first.
 - Challenge weak assumptions. Do not agree by default.
-- Name one risk, disagreement, or assumption before accepting the lead's view, unless there is truly no meaningful objection.
+- If you disagree, say so plainly. If there is a meaningful risk or assumption, name it.
 - Recommend a practical decision, or ask one direct follow-up question if the decision is not ready.
 - If the topic is broad, large, or unclear, ask one direct clarifying question instead of guessing.
-- Do not edit files, run implementation, expand scope, use headings, or write a long audit.
+- Do not edit files, run implementation, expand scope, or write a long audit.
 - For broad repo opinions, do not read every file; use current context and a few high-signal files if useful. Ask before a broad scan.
-- If you hit a stop condition, say it plainly: clear decision, next task, blocker, max rounds, timeout, or no new value.
-
-Required first line:
-
-TYPE: CHAT_REPLY
+- Keep it concise by default, but use the length needed to answer clearly.
 `;
 }
 
@@ -125,7 +121,14 @@ function renderWorkerPrompt(message: OrchMessage): string {
 }
 
 function stripChatReplyMarker(value: any): string {
-  return String(value || "").replace(/^\s*TYPE:\s*CHAT_REPLY\s*\r?\n?/i, "").trim();
+  let text = String(value || "").trim();
+  let previous = "";
+  while (text !== previous) {
+    previous = text;
+    text = text.replace(/^\s*TYPE:\s*CHAT_REPLY\s*\r?\n?/i, "").trim();
+    text = text.replace(/^\s*MODE:\s*TALK\s*\r?\n?/i, "").trim();
+  }
+  return text;
 }
 
 function renderLeadPrompt(message: OrchMessage): string {
@@ -134,15 +137,9 @@ function renderLeadPrompt(message: OrchMessage): string {
   const type = message.type || "RESULT";
   const summary = type === "CHAT_REPLY" ? stripChatReplyMarker(rawSummary) : rawSummary;
   if (type === "CHAT_REPLY") {
-    return `[Orchlink] Message from ${message.from_agent || "work"}
+    return `[Orchlink] ${message.from_agent || "work"} · ${message.conversation_id || ""} · ${message.turn || "?"}/${message.max_turns || "?"}
 
-Conversation: ${message.conversation_id || ""}
-Turn: ${message.turn || "?"}/${message.max_turns || "?"}
-
-Worker says:
-${summary}
-
-Next: if worker asked a direct question, answer it first with orch say ${message.conversation_id || "<conversation_id>"} -m "<your answer>". Otherwise continue only if useful, or close with orch close ${message.conversation_id || "<conversation_id>"} -m "Decision: ..." after a clear decision.`;
+${summary}`;
   }
 
   return `[Orchlink] Result from ${message.from_agent || "work"}
