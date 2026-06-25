@@ -29,36 +29,11 @@ function isChatRequest(message: OrchMessage): boolean {
 
 function renderWorkerTalkPrompt(message: OrchMessage): string {
   const payload = message.payload || {};
-  return `You are the worker coding agent in a Talk Mode conversation with the lead.
-
-This is a peer discussion, not a task assignment. If the lead's text contains TASK_ID, scope, or checklist language, treat it only as discussion context.
-
-Conversation ID:
-${message.conversation_id || ""}
-
-Turn:
-${message.turn || 1}/${message.max_turns || 6}
-
-Discussion topic:
-${payload.topic || ""}
-
-Lead says:
-${payload.message || payload.intent || ""}
-
-Transcript preview:
-${payload.transcript_preview || ""}
-
-Guidance:
-- Reply naturally, like a teammate in chat. No template and no required labels.
-- Answer the lead's latest question first.
-- Challenge weak assumptions. Do not agree by default.
-- If you disagree, say so plainly. If there is a meaningful risk or assumption, name it.
-- Recommend a practical decision, or ask one direct follow-up question if the decision is not ready.
-- If the topic is broad, large, or unclear, ask one direct clarifying question instead of guessing.
-- Do not edit files, run implementation, expand scope, or write a long audit.
-- For broad repo opinions, do not read every file; use current context and a few high-signal files if useful. Ask before a broad scan.
-- Keep it concise by default, but use the length needed to answer clearly.
-`;
+  const speaker = message.from_agent || "lead";
+  const conversation = message.conversation_id || "";
+  const turn = `${message.turn || 1}/${message.max_turns || 6}`;
+  const text = payload.message || payload.intent || payload.topic || "";
+  return `[Orchlink Talk] ${speaker} · ${conversation} · ${turn}\n\n${text}`;
 }
 
 function renderWorkerTaskPrompt(message: OrchMessage): string {

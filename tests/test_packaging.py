@@ -45,8 +45,12 @@ def test_pi_extension_uses_valid_record_type():
     assert "type OrchMessage = Record;" not in ORCHLINK_PI_EXTENSION
     assert "TYPE: CHAT_REPLY" not in ORCHLINK_PI_EXTENSION
     assert "MODE: TALK" not in ORCHLINK_PI_EXTENSION
-    assert "No template and no required labels" in ORCHLINK_PI_EXTENSION
-    assert "do not read every file" in ORCHLINK_PI_EXTENSION
+    assert "[Orchlink Talk] ${speaker}" in ORCHLINK_PI_EXTENSION
+    assert "You are the worker coding agent in a Talk Mode conversation" not in ORCHLINK_PI_EXTENSION
+    assert "Guidance:" not in ORCHLINK_PI_EXTENSION
+    assert "Lead says:" not in ORCHLINK_PI_EXTENSION
+    assert "Transcript preview:" not in ORCHLINK_PI_EXTENSION
+    assert "Discussion topic:" not in ORCHLINK_PI_EXTENSION
     assert "too broad" in ORCHLINK_PI_EXTENSION
     assert "stripChatReplyMarker" in ORCHLINK_PI_EXTENSION
     assert "pendingTask" in ORCHLINK_PI_EXTENSION
