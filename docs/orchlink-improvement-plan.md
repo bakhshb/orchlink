@@ -69,17 +69,7 @@ Update generated `.orch/skills/work.md`:
 
 ```text
 Follow the lead's requested reply shape.
-If no reply shape is requested, use a concise default.
-```
-
-Suggested default when no shape is given:
-
-```text
-summary:
-changed/inspected:
-tests:
-risks/blockers:
-next:
+If no reply shape is requested, reply concisely in the shape that fits the work. Do not invent a fixed result template.
 ```
 
 For Talk Mode:
