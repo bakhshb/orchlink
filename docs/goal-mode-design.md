@@ -577,15 +577,9 @@ Keep this distinction:
 
 ### Phase-aware compaction
 
-Pi already supports manual and automatic compaction. Orchlink should use that existing mechanism instead of building a new summarizer.
+Pi already supports manual and automatic compaction. Orchlink uses that existing mechanism instead of building a new summarizer.
 
-Add an Orchlink-aware Pi extension command later:
-
-```text
-/orch compact-phase "parser slice reviewed; tests passed; next: docs"
-```
-
-The extension should call Pi's native compaction API with focused instructions, preserving:
+Orchlink should make normal Pi compaction Orchlink-aware through the `session_before_compact` hook, preserving:
 
 - completed phase summary
 - review verdict
@@ -598,16 +592,15 @@ The extension should call Pi's native compaction API with focused instructions, 
 - next exact step
 - pointers to durable `.orch/` state files
 
-Do not auto-compact silently. MVP should keep phase compaction manual or ask the user after a clean review:
+Auto-compaction should happen only after the lead has reconciled a review/phase boundary. The lead closes the phase with a marker such as:
 
 ```text
-Review passed. Compact this phase now?
-> Compact
-  Skip
-  Later
+Review reconciled: proceed. Tests: 177 passed. Next: tag release.
 ```
 
-Only suggest phase compaction when:
+Then the Pi extension may call Pi's native compaction API automatically if no worker task is active. For manual compaction, users should use Pi's native `/compact`; Orchlink should not add a separate manual compaction command.
+
+Only auto-compact when:
 
 - review passed or the phase is explicitly closed
 - no worker task is active
